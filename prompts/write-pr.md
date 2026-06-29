@@ -34,7 +34,7 @@ If the context is not enough to write a specific PR body, inspect the current br
 
 ## Style rules
 
-- Use my writing profile in this repository at `prompts/writing-style.md`.
+- Use my writing profile in this repository at `references/writing-style.md`.
 - Casual, direct, practical, plain-English.
 - No em dashes.
 - Avoid colon-heavy AI-ish phrasing.
