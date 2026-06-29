@@ -1,13 +1,14 @@
 # gm-pi-environment
 
-Personal source of truth for Pi setup across machines.
+Personal source of truth for Pi setup across machines for moi.
 
-This repo contains shared Pi skills, personal extensions, and portable config extracted from the base machine.
+This repo contains shared Pi skills, personal extensions, and portable config so I can try keep track of the ever moving landscape.
 
 ## Contents
 
 - `skills/` — shared skills that should be available everywhere Pi is used.
 - `extensions/` — personal Pi extensions folded into this environment package.
+- `prompts/` — shared prompt templates and writing profile.
 - `config/pi/AGENTS.md` — global Pi agent instructions.
 - `config/pi/settings.base.json` — portable global Pi settings, excluding machine-local extension paths, `pi-mono-ask-user-question`, generated state, and the local Ollama provider.
 - `config/pi/mcp.json` — portable MCP config.
