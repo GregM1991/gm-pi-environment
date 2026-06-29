@@ -1,0 +1,6 @@
+{
+  "notes": "Copy values from this file into ~/.pi/agent/settings.json only for machine-specific overrides. Do not commit real secrets or machine-only paths.",
+  "enabledModels": [
+    "openai-codex/gpt-5.5"
+  ]
+}

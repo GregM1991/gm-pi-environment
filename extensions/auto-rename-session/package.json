@@ -1,0 +1,42 @@
+{
+  "name": "auto-rename-session",
+  "version": "0.1.0",
+  "description": "Pi extension that automatically names sessions, then periodically updates the name only when the conversation meaningfully deviates.",
+  "type": "module",
+  "main": "index.ts",
+  "files": [
+    "index.ts",
+    "README.md"
+  ],
+  "scripts": {
+    "check": "bun --check index.ts",
+    "test": "bun test"
+  },
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "session",
+    "rename",
+    "auto-name"
+  ],
+  "author": "GregM1991",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GregM1991/personal-pi-extensions.git",
+    "directory": "packages/auto-rename-session"
+  },
+  "bugs": {
+    "url": "https://github.com/GregM1991/personal-pi-extensions/issues"
+  },
+  "homepage": "https://github.com/GregM1991/personal-pi-extensions/tree/main/packages/auto-rename-session#readme",
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.5",
+  "defaultThinkingLevel": "medium",
+  "hideThinkingBlock": false,
+  "enabledModels": [
+    "openai-codex/gpt-5.4",
+    "openai-codex/gpt-5.4-mini",
+    "openai-codex/gpt-5.5"
+  ],
+  "packages": [
+    "npm:pi-web-access",
+    "npm:pi-subagents",
+    "npm:context-mode",
+    "npm:pi-mcp-adapter",
+    "npm:pi-hermes-memory",
+    "npm:pi-powerline-footer",
+    "npm:pi-playwright",
+    "npm:pi-agent-browser-native",
+    "npm:@hypabolic/pi-hypa"
+  ],
+  "doubleEscapeAction": "tree",
+  "treeFilterMode": "no-tools",
+  "warnings": {
+    "anthropicExtraUsage": true
+  },
+  "theme": "dark",
+  "powerline": "default"
+}

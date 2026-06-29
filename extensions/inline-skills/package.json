@@ -1,0 +1,40 @@
+{
+  "name": "inline-skills",
+  "version": "0.1.0",
+  "description": "Pi extension that lets you reference skills inline anywhere in a chat message, with autocomplete.",
+  "type": "module",
+  "main": "index.ts",
+  "files": [
+    "index.ts",
+    "README.md"
+  ],
+  "scripts": {
+    "check": "bun --check index.ts"
+  },
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "skills",
+    "autocomplete"
+  ],
+  "author": "GregM1991",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GregM1991/personal-pi-extensions.git",
+    "directory": "packages/inline-skills"
+  },
+  "bugs": {
+    "url": "https://github.com/GregM1991/personal-pi-extensions/issues"
+  },
+  "homepage": "https://github.com/GregM1991/personal-pi-extensions/tree/main/packages/inline-skills#readme",
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+# dependencies/build output
+node_modules/
+dist/
+build/
+coverage/
+
+# local/runtime pi state; do not commit secrets or generated caches
+config/pi/auth.json
+config/pi/sessions/
+config/pi/trust.json
+config/pi/run-history.jsonl
+config/pi/mcp-cache.json
+config/pi/mcp-onboarding.json
+*.local.json
+.env
+.env.*
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/

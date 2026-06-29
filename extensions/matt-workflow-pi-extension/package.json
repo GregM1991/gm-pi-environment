@@ -1,0 +1,49 @@
+{
+  "name": "matt-workflow-pi-extension",
+  "version": "0.1.0",
+  "description": "Pi extension for a Matt Pocock-style AI feature workflow using vendored Matt engineering skills.",
+  "type": "module",
+  "author": "GregM1991",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GregM1991/personal-pi-extensions.git",
+    "directory": "packages/matt-workflow-pi-extension"
+  },
+  "bugs": {
+    "url": "https://github.com/GregM1991/personal-pi-extensions/issues"
+  },
+  "homepage": "https://github.com/GregM1991/personal-pi-extensions/tree/main/packages/matt-workflow-pi-extension#readme",
+  "files": [
+    "index.ts",
+    "skills/**/*",
+    "augmentations/**/*",
+    "vendor/**/*",
+    "docs/**/*",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "check": "bun --check index.ts scripts/sync-matt-skills.ts",
+    "sync:matt-skills": "bun scripts/sync-matt-skills.ts",
+    "sync:matt-skills:dry-run": "bun scripts/sync-matt-skills.ts --dry-run"
+  },
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "matt-workflow",
+    "ai-workflow"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  }
+}

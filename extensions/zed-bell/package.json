@@ -1,0 +1,33 @@
+{
+  "name": "zed-bell",
+  "version": "0.1.0",
+  "description": "Pi extension that emits a terminal bell when an agent turn finishes, for Zed Terminal Thread notifications.",
+  "type": "module",
+  "main": "index.ts",
+  "files": [
+    "index.ts",
+    "README.md"
+  ],
+  "scripts": {
+    "check": "bun --check index.ts"
+  },
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "zed",
+    "terminal",
+    "bell",
+    "notification"
+  ],
+  "author": "GregM1991",
+  "license": "MIT",
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}
