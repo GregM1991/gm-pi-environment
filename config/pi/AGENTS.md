@@ -1,5 +1,9 @@
 # Global Pi Agent Instructions
 
+## General Instructions
+
+- Do not auto-commit after work has been completed. Wait for the user to confirm before committing.
+
 ## Context preservation
 
 For commands, logs, tests, API calls, git history, large files, browser snapshots, or any output that might exceed a few lines, use the context-mode skill/tools. Prefer `ctx_execute`, `ctx_execute_file`, `ctx_batch_execute`, `ctx_fetch_and_index`, and `ctx_search` over raw Bash/read output. Read the `context-mode` skill before large-output work if its detailed workflow is needed.
