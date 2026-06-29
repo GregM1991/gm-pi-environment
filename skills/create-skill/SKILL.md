@@ -1,7 +1,6 @@
 ---
 name: create-skill
 description: Guide for creating effective skills following best practices. Use when creating or updating skills that extend agent capabilities.
-disable-model-invocation: true
 ---
 
 # Create Skill

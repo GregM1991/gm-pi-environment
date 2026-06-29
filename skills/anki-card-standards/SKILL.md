@@ -7,7 +7,6 @@ description: |
   "review these cards", "are these cards good", or any task involving flashcard authoring.
   Also triggers when the anki-connect skill is active and cards are being authored.
   This skill defines HOW cards should be written. The anki-connect skill defines how to PUSH them.
-disable-model-invocation: true
 ---
 
 # Anki Card Authoring Standards

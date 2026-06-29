@@ -1,7 +1,6 @@
 ---
 name: build-react-codebase-guidelines
 description: Guides agents proactively while building and iterating on React and TypeScript codebases. Use when implementing React features, shaping components, adding hooks, introducing state, choosing dependencies, organizing frontend files, or preparing React code for review.
-disable-model-invocation: true
 ---
 
 <objective>

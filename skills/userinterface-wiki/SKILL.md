@@ -5,7 +5,6 @@ license: MIT
 metadata:
   author: raphael-salaja
   version: "3.0.0"
-disable-model-invocation: true
 ---
 
 # User Interface Wiki

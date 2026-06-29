@@ -1,7 +1,6 @@
 ---
 name: create-agents-md
 description: Create AGENTS.md files for project-specific inline rules. Use when adding small, project-specific instructions that should be committed in repos.
-disable-model-invocation: true
 ---
 
 # Create AGENTS.md

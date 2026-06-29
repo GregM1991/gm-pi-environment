@@ -30,7 +30,6 @@ metadata:
           ],
       },
   }
-disable-model-invocation: true
 ---
 
 # Coding Agent (always backgrounded)

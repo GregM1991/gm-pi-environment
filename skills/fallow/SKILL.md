@@ -6,7 +6,6 @@ metadata:
   author: Bart Waardenburg
   version: 1.0.0
   homepage: https://docs.fallow.tools
-disable-model-invocation: true
 ---
 
 # Fallow: codebase intelligence for JavaScript and TypeScript

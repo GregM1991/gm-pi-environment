@@ -1,7 +1,6 @@
 ---
 name: observability
 description: Add agent-first observability to code — structured logs, health endpoints, failure-state persistence, and explicit failure modes — so the next agent hitting a problem at 3am has the signals it needs to diagnose. Use when asked to "add logging", "add observability", "add metrics", "debug later", "make this observable", or when building/refactoring a subsystem that will run unattended (background jobs, servers, watchers).
-disable-model-invocation: true
 ---
 
 <objective>

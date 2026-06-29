@@ -1,7 +1,6 @@
 ---
 name: write-docs
 description: Write AI-scannable technical documentation.
-disable-model-invocation: true
 ---
 
 # Write Documentation

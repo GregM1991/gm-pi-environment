@@ -12,7 +12,6 @@ description: >
   "improve code efficiency", "reduce latency", "optimize performance", "code smell detection",
   "find slow code", "optimize this project", "performance audit", "code optimization".
   Also triggers on: "optimizar codigo", "encontrar cuellos de botella", "mejorar rendimiento".
-disable-model-invocation: true
 ---
 
 # Code Optimizer

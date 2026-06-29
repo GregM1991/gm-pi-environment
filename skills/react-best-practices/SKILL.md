@@ -5,7 +5,6 @@ license: MIT
 metadata:
   author: vercel
   version: "1.0.0"
-disable-model-invocation: true
 ---
 
 # Vercel React Best Practices
