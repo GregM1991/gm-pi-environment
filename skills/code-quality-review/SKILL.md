@@ -10,15 +10,15 @@ Route code quality work to the smallest relevant specialist skill while keeping 
 <routing>
 Choose the narrowest specialist path that matches the user's request:
 
-- Review staged/unstaged changes, commits, PR-ready diffs, bug risks, performance concerns, code quality, or test coverage gaps → read `/home/gm/.agents/skills/review/SKILL.md`
-- Apply modern web development best practices, compatibility checks, general code quality standards, modernization, or Lighthouse-style best-practices checks → read `/home/gm/.agents/skills/best-practices/SKILL.md`
-- Deep performance optimization audit, bottleneck hunting, anti-pattern detection, memory/algorithm/concurrency/cache/build/logging/infrastructure efficiency review → read `/home/gm/.agents/skills/code-optimizer/SKILL.md`
+- Review staged/unstaged changes, commits, PR-ready diffs, bug risks, performance concerns, code quality, or test coverage gaps → read `../review/SKILL.md`
+- Apply modern web development best practices, compatibility checks, general code quality standards, modernization, or Lighthouse-style best-practices checks → read `../best-practices/SKILL.md`
+- Deep performance optimization audit, bottleneck hunting, anti-pattern detection, memory/algorithm/concurrency/cache/build/logging/infrastructure efficiency review → read `../code-optimizer/SKILL.md`
 </routing>
 
 <security_boundary>
 Do not treat this router as a replacement for `security-review`.
 
-If the user explicitly asks for a security review, threat model, vulnerability audit, auth/input/data-access review, or secure design review, use `/home/gm/.agents/skills/security-review/SKILL.md` separately. That skill remains model-invocable and intentionally outside this consolidation.
+If the user explicitly asks for a security review, threat model, vulnerability audit, auth/input/data-access review, or secure design review, use `../security-review/SKILL.md` separately. That skill remains model-invocable and intentionally outside this consolidation.
 </security_boundary>
 
 <process>

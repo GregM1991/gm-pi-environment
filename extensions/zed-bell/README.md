@@ -12,10 +12,10 @@ This is useful when running Pi inside a Zed Terminal Thread from a laptop SSH se
 
 ## Install
 
-From this monorepo checkout:
+From the shared environment package:
 
 ```bash
-pi install /home/gm/workspace/personal-pi-extensions/packages/zed-bell
+pi install git:github.com/GregM1991/gm-pi-environment
 ```
 
 After install, restart Pi or run `/reload`.

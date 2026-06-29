@@ -34,22 +34,16 @@ The extension adds autocomplete for inline skill references. Type one of these a
 
 ## Install
 
-From npm / Pi marketplace after publish:
+From the shared environment package:
 
 ```bash
-pi install npm:inline-skills
+pi install git:github.com/GregM1991/gm-pi-environment
 ```
 
-With npx, if you prefer invoking Pi without a global install:
+Local development install from this checkout:
 
 ```bash
-npx pi install npm:inline-skills
-```
-
-Local development install from this monorepo:
-
-```bash
-pi install /home/gm/workspace/personal-pi-extensions/packages/inline-skills
+pi install /home/gm/workspace/pi-environment
 ```
 
 ## Notes

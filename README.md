@@ -16,17 +16,25 @@ This repo contains shared Pi skills, personal extensions, and portable config so
 - `bin/bootstrap.sh` — install/apply this environment on a machine.
 - `bin/empty-system-skills-dir.sh` — keep `~/.agents/skills` as a local-only scratch dir by emptying it after backup.
 
-## Install locally during development
+## Install from GitHub
+
+For dogfooding the shared package resources only:
 
 ```bash
-pi install /home/gm/workspace/pi-environment
+pi install git:github.com/GregM1991/gm-pi-environment
 ```
 
-## Install from git on another machine
+For a full machine bootstrap that also applies `config/pi/AGENTS.md`, `mcp.json`, and `settings.base.json`:
 
 ```bash
-git clone <repo-url> ~/workspace/pi-environment
+git clone https://github.com/GregM1991/gm-pi-environment.git ~/workspace/pi-environment
 ~/workspace/pi-environment/bin/bootstrap.sh
+```
+
+`bootstrap.sh` registers the GitHub package by default so future `pi update --extensions` runs can reconcile it. During local development, install the working tree directly:
+
+```bash
+PI_ENV_PACKAGE_SOURCE=/home/gm/workspace/pi-environment /home/gm/workspace/pi-environment/bin/bootstrap.sh
 ```
 
 ## Local-only skills

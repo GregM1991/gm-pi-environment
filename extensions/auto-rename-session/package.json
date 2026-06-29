@@ -24,13 +24,13 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/GregM1991/personal-pi-extensions.git",
-    "directory": "packages/auto-rename-session"
+    "url": "git+https://github.com/GregM1991/gm-pi-environment.git",
+    "directory": "extensions/auto-rename-session"
   },
   "bugs": {
-    "url": "https://github.com/GregM1991/personal-pi-extensions/issues"
+    "url": "https://github.com/GregM1991/gm-pi-environment/issues"
   },
-  "homepage": "https://github.com/GregM1991/personal-pi-extensions/tree/main/packages/auto-rename-session#readme",
+  "homepage": "https://github.com/GregM1991/gm-pi-environment/tree/main/extensions/auto-rename-session#readme",
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
   },

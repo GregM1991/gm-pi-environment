@@ -65,10 +65,10 @@ With npx, if you prefer invoking Pi without a global install:
 npx pi install npm:matt-workflow-pi-extension
 ```
 
-Local development install from this monorepo:
+Local development install from this environment repo:
 
 ```bash
-pi install /home/gm/workspace/personal-pi-extensions/packages/matt-workflow-pi-extension
+pi install /home/gm/workspace/pi-environment
 ```
 
 ## Direct invocation alias
@@ -77,19 +77,18 @@ Use this when you want a clean Matt-only Pi session instead of installing global
 
 ```bash
 alias pi-matt='pi --no-skills --no-extensions \
-  -e "$HOME/workspace/personal-pi-extensions/packages/matt-workflow-pi-extension/index.ts" \
-  --skill "$HOME/workspace/personal-pi-extensions/packages/matt-workflow-pi-extension/skills/matt-workflow"'
+  -e "$HOME/workspace/pi-environment/extensions/matt-workflow-pi-extension/index.ts" \
+  --skill "$HOME/workspace/pi-environment/extensions/matt-workflow-pi-extension/skills/matt-workflow"'
 ```
 
 Companion-extension variant:
 
 ```bash
 alias pi-matt-full='pi --no-skills --no-extensions \
-  -e "$HOME/workspace/personal-pi-extensions/packages/matt-workflow-pi-extension/index.ts" \
-  -e "$HOME/workspace/personal-pi-extensions/packages/compact-codex/index.ts" \
+  -e "$HOME/workspace/pi-environment/extensions/matt-workflow-pi-extension/index.ts" \
   -e "$HOME/.nvm/versions/node/v22.18.0/lib/node_modules/pi-subagents/src/extension/index.ts" \
   -e "$HOME/.nvm/versions/node/v22.18.0/lib/node_modules/pi-web-access/index.ts" \
-  --skill "$HOME/workspace/personal-pi-extensions/packages/matt-workflow-pi-extension/skills/matt-workflow"'
+  --skill "$HOME/workspace/pi-environment/extensions/matt-workflow-pi-extension/skills/matt-workflow"'
 ```
 
 ## Grill notes and refactor extraction

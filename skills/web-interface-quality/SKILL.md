@@ -10,11 +10,11 @@ Route web interface quality work to the smallest relevant specialist skill inste
 <routing>
 Choose the narrowest specialist path that matches the user's request:
 
-- Accessibility, WCAG, screen readers, keyboard navigation, contrast, ARIA, semantic HTML → read `/home/gm/.agents/skills/accessibility/SKILL.md`
-- Core Web Vitals, LCP, INP, CLS, page experience, layout shift, loading/interactivity metrics → read `/home/gm/.agents/skills/core-web-vitals/SKILL.md`
-- UI/UX implementation rules, animations, CSS, audio, typography, prefetching, icons, file:line UI findings → read `/home/gm/.agents/skills/userinterface-wiki/SKILL.md`
-- Web Interface Guidelines compliance, general UI review, design audit, UX audit → read `/home/gm/.agents/skills/web-design-guidelines/SKILL.md`
-- Full website/page audit across performance, accessibility, SEO, and best practices → read `/home/gm/.agents/skills/web-quality-audit/SKILL.md`
+- Accessibility, WCAG, screen readers, keyboard navigation, contrast, ARIA, semantic HTML → read `../accessibility/SKILL.md`
+- Core Web Vitals, LCP, INP, CLS, page experience, layout shift, loading/interactivity metrics → read `../core-web-vitals/SKILL.md`
+- UI/UX implementation rules, animations, CSS, audio, typography, prefetching, icons, file:line UI findings → read `../userinterface-wiki/SKILL.md`
+- Web Interface Guidelines compliance, general UI review, design audit, UX audit → read `../web-design-guidelines/SKILL.md`
+- Full website/page audit across performance, accessibility, SEO, and best practices → read `../web-quality-audit/SKILL.md`
 </routing>
 
 <process>

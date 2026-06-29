@@ -10,9 +10,9 @@ Route frontend design and implementation work to the smallest relevant specialis
 <routing>
 Choose the narrowest specialist path that matches the user's request:
 
-- Build a new page, component, landing page, dashboard, poster, artifact, or visually distinctive frontend interface → read `/home/gm/.agents/skills/frontend-design/SKILL.md`
-- Polish an existing interface, improve how it feels, add/refine animations, hover states, shadows, borders, typography, micro-interactions, optical alignment, or visual details → read `/home/gm/.agents/skills/make-interfaces-feel-better/SKILL.md`
-- React or Next.js performance patterns, component refactors, bundle optimization, data fetching, rendering behavior, or Vercel-style frontend performance review → read `/home/gm/.agents/skills/react-best-practices/SKILL.md`
+- Build a new page, component, landing page, dashboard, poster, artifact, or visually distinctive frontend interface → read `../frontend-design/SKILL.md`
+- Polish an existing interface, improve how it feels, add/refine animations, hover states, shadows, borders, typography, micro-interactions, optical alignment, or visual details → read `../make-interfaces-feel-better/SKILL.md`
+- React or Next.js performance patterns, component refactors, bundle optimization, data fetching, rendering behavior, or Vercel-style frontend performance review → read `../react-best-practices/SKILL.md`
 </routing>
 
 <process>

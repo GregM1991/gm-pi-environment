@@ -49,4 +49,4 @@ Each candidate should include enough context to make a quick later decision:
 
 ## Provenance
 
-This augmentation was extracted by directly comparing the vendored `grill-with-docs/SKILL.md` against the local `/home/gm/.agents/skills/grill-with-docs/SKILL.md`. The scratch-document section existed only in the vendored copy, so it lives here instead of inside `vendor/`.
+This augmentation was extracted by directly comparing the vendored `grill-with-docs/SKILL.md` against the previously local `grill-with-docs` skill. The scratch-document section existed only in the vendored copy, so it lives here instead of inside `vendor/`.

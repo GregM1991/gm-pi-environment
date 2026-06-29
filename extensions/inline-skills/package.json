@@ -22,13 +22,13 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/GregM1991/personal-pi-extensions.git",
-    "directory": "packages/inline-skills"
+    "url": "git+https://github.com/GregM1991/gm-pi-environment.git",
+    "directory": "extensions/inline-skills"
   },
   "bugs": {
-    "url": "https://github.com/GregM1991/personal-pi-extensions/issues"
+    "url": "https://github.com/GregM1991/gm-pi-environment/issues"
   },
-  "homepage": "https://github.com/GregM1991/personal-pi-extensions/tree/main/packages/inline-skills#readme",
+  "homepage": "https://github.com/GregM1991/gm-pi-environment/tree/main/extensions/inline-skills#readme",
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
   },

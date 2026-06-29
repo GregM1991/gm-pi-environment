@@ -7,13 +7,13 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/GregM1991/personal-pi-extensions.git",
-    "directory": "packages/matt-workflow-pi-extension"
+    "url": "git+https://github.com/GregM1991/gm-pi-environment.git",
+    "directory": "extensions/matt-workflow-pi-extension"
   },
   "bugs": {
-    "url": "https://github.com/GregM1991/personal-pi-extensions/issues"
+    "url": "https://github.com/GregM1991/gm-pi-environment/issues"
   },
-  "homepage": "https://github.com/GregM1991/personal-pi-extensions/tree/main/packages/matt-workflow-pi-extension#readme",
+  "homepage": "https://github.com/GregM1991/gm-pi-environment/tree/main/extensions/matt-workflow-pi-extension#readme",
   "files": [
     "index.ts",
     "skills/**/*",

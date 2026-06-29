@@ -16,10 +16,10 @@ Pi extension that automatically keeps a concise generated display name for the c
 
 ## Install
 
-From this monorepo checkout:
+From the shared environment package:
 
 ```bash
-pi install /home/greg/workspace/personal-pi-extensions/packages/auto-rename-session
+pi install git:github.com/GregM1991/gm-pi-environment
 ```
 
 After install, restart Pi or run `/reload`.
