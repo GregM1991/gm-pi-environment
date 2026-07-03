@@ -127,7 +127,7 @@ Normal phase prompts also carry a lightweight reminder to use this lens only whe
 
 ## Issue-aware skill routing
 
-Routing-aware commands use typed extension defaults plus optional strict repo JSON at `.pi/matt-skill-routes.json` (`version: 1`). Defaults keep the worker baseline small (`implement`, `tdd`) and add ticket-specific routed skills only when issue labels/title/body/path hints provide evidence.
+Routing-aware commands use typed extension defaults plus optional strict repo JSON at `.pi/matt-skill-routes.json` (`version: 1`). Defaults keep the baselines small (worker: `implement`, `tdd`; review: `code-review`) and add ticket-specific routed skills only when issue labels/title/body/path hints provide evidence.
 
 Config shape:
 
@@ -158,11 +158,12 @@ Routing-aware commands hard-stop on invalid config, missing selected routed skil
 - Loads only the local `matt-workflow` orchestrator skill by default.
 - Phase prompts reference vendored Matt Pocock engineering skills under `vendor/mattpocock-skills/engineering/`.
 - Phase prompts also reference local phase-scoped augmentation files under `augmentations/`.
-- Treat `vendor/mattpocock-skills/engineering/` as upstream-owned/read-only: do not put local workflow customizations there.
+- Treat `vendor/mattpocock-skills/` as upstream-owned/read-only: do not put local workflow customizations there.
 - Track the vendored upstream source in `vendor/mattpocock-skills/SOURCE.json`.
 - Refresh vendored upstream skills with `bun run sync:matt-skills`; preview the source ref with `bun run sync:matt-skills:dry-run`.
 - Put local Matt workflow policy in `augmentations/<phase>.md`; upstream Matt skills remain the base workflow, and matching local augmentations win on conflict.
-- Deprecated, in-progress, productivity, misc, and personal Matt skills are intentionally excluded unless deliberately promoted into this extension later.
+- All upstream categories except `deprecated` are vendored (engineering, productivity, misc, personal, in-progress) and registered as Pi skill paths. The vendored copy is the canonical source for Matt's skills across the whole environment; they are not duplicated in the environment's `skills/` directory.
+- Vendored skills are exact upstream copies, including upstream's `disable-model-invocation` choices: skills upstream marks user-invoked stay user-invoked here.
 
 Inspect mapping with:
 
@@ -181,9 +182,9 @@ bun run sync:matt-skills
 bun run check
 ```
 
-The sync command clones `https://github.com/mattpocock/skills`, replaces `vendor/mattpocock-skills/engineering/`, copies the upstream license, and updates `vendor/mattpocock-skills/SOURCE.json` with the exact upstream commit.
+The sync command clones `https://github.com/mattpocock/skills`, replaces every vendored category directory (all except `deprecated`), copies the upstream license, and updates `vendor/mattpocock-skills/SOURCE.json` with the exact upstream commit.
 
-After syncing, inspect `/matt-skills` and `index.ts` for renamed or newly useful engineering skills before publishing.
+After syncing, inspect `/matt-skills` and `index.ts` for renamed or newly useful skills before publishing, and check whether upstream added skills that duplicate a job owned by a skill in the environment's `skills/` directory (upstream wins; prune the local one).
 
 ## Verify
 

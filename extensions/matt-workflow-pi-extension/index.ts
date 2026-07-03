@@ -26,7 +26,11 @@ type AugmentationRef = {
 const EXTENSION_NAME = "matt-workflow";
 const PHASES: Phase[] = ["intake", "grill", "prd", "refactors", "slice", "afk", "review", "closeout", "auto"];
 const EXTENSION_ROOT = path.dirname(fileURLToPath(import.meta.url));
-const MATT_ENGINEERING_SKILLS_ROOT = path.join(EXTENSION_ROOT, "vendor", "mattpocock-skills", "engineering");
+const MATT_VENDOR_ROOT = path.join(EXTENSION_ROOT, "vendor", "mattpocock-skills");
+const MATT_ENGINEERING_SKILLS_ROOT = path.join(MATT_VENDOR_ROOT, "engineering");
+// Synced upstream categories (all except deprecated); vendor is the canonical
+// copy of Matt's skills, so none of these are duplicated in the environment's skills/.
+const MATT_VENDOR_CATEGORIES = ["engineering", "productivity", "misc", "personal", "in-progress"];
 const AUGMENTATIONS_ROOT = path.join(EXTENSION_ROOT, "augmentations");
 
 const skill = (name: string, relativePath: string, useWhen: string): SkillRef => ({
@@ -52,6 +56,7 @@ const PHASE_SKILLS: Record<PhaseWithStatus, SkillRef[]> = {
 	grill: [
 		skill("grill-with-docs", "grill-with-docs/SKILL.md", "codebase work that should challenge plans against CONTEXT.md and ADRs"),
 		skill("domain-modeling", "domain-modeling/SKILL.md", "pinning down domain terminology or a ubiquitous language during alignment"),
+		skill("research", "research/SKILL.md", "delegating primary-source docs/API research to a background agent while grilling continues"),
 		skill("prototype", "prototype/SKILL.md", "a throwaway prototype would flush out a design before committing"),
 		skill("codebase-design", "codebase-design/SKILL.md", "using deep-module vocabulary while shaping architecture-sensitive plans"),
 		skill("improve-codebase-architecture", "improve-codebase-architecture/SKILL.md", "architecture/deep-module opportunities discovered while shaping a plan"),
@@ -75,6 +80,7 @@ const PHASE_SKILLS: Record<PhaseWithStatus, SkillRef[]> = {
 		skill("resolving-merge-conflicts", "resolving-merge-conflicts/SKILL.md", "an in-progress merge or rebase conflict blocks implementation"),
 	],
 	review: [
+		skill("code-review", "code-review/SKILL.md", "two-axis Standards/Spec review of the diff against a fixed point"),
 		skill("codebase-design", "codebase-design/SKILL.md", "review needs deep-module vocabulary or interface-quality assessment"),
 		skill("improve-codebase-architecture", "improve-codebase-architecture/SKILL.md", "review identifies architecture/deep-module improvement opportunities"),
 		skill("diagnosing-bugs", "diagnosing-bugs/SKILL.md", "review finds a hard bug requiring disciplined reproduction"),
@@ -86,6 +92,7 @@ const PHASE_SKILLS: Record<PhaseWithStatus, SkillRef[]> = {
 		skill("triage", "triage/SKILL.md", "finding and ordering ready-for-agent issues and detecting blocker labels"),
 		skill("implement", "implement/SKILL.md", "implementation worker contracts for issue-based work"),
 		skill("tdd", "tdd/SKILL.md", "implementation worker contracts should prefer test-first slices"),
+		skill("code-review", "code-review/SKILL.md", "review child contracts: two-axis Standards/Spec review of each issue's diff"),
 		skill("diagnosing-bugs", "diagnosing-bugs/SKILL.md", "worker or review loops hit hard bugs or regressions"),
 		skill("codebase-design", "codebase-design/SKILL.md", "review detects interface or deep-module design issues that should stop auto mode"),
 		skill("improve-codebase-architecture", "improve-codebase-architecture/SKILL.md", "review detects architectural issues that should stop auto mode"),
@@ -147,9 +154,9 @@ function skillInstructions(phase: PhaseWithStatus): string {
 	}
 
 	return [
-		"Phase skills are loaded into Pi from the vendored mattpocock/skills engineering folder and are also listed here with absolute paths for this phase.",
-		"Use only the loaded Matt engineering skills that actually apply to this target. If a listed skill does not fit the task, skip it and briefly say why.",
-		"Do not read, invoke, or reference non-engineering Matt skills or non-Matt skills. Using Pi extension tools such as subagent orchestration is allowed when the phase prompt explicitly asks for orchestration, but do not load their skill docs as workflow guidance.",
+		"Phase skills are loaded into Pi from the vendored mattpocock/skills folders and are also listed here with absolute paths for this phase.",
+		"Use only the listed phase skills that actually apply to this target. If a listed skill does not fit the task, skip it and briefly say why.",
+		"Use only skills listed in this phase prompt or assigned to you via a skill pack (baseline plus routed skills); do not pull in other skills as workflow guidance on your own. Using Pi extension tools such as subagent orchestration is allowed when the phase prompt explicitly asks for orchestration.",
 		"Relevant phase engineering skill files:",
 		...refs.map((ref) => `- ${ref.name}: ${ref.absolutePath} — ${ref.useWhen}`),
 	].join("\n");
@@ -294,19 +301,39 @@ function routingAwarePromptAddition(phase: Phase, args: string, cwd: string): st
 	return undefined;
 }
 
+function trackerHint(cwd: string): string {
+	return existsSync(path.join(cwd, "docs", "agents", "triage-labels.md"))
+		? "This repo uses GitHub Issues as the durable tracker and labels from `docs/agents/triage-labels.md`."
+		: "Use GitHub Issues as the durable tracker unless repo docs say otherwise. No `docs/agents/triage-labels.md` was detected; follow the repo's own tracker/label conventions, or recommend `setup-matt-pocock-skills` if none exist.";
+}
+
+function toolchainHint(cwd: string): string {
+	const bunFirst = existsSync(path.join(cwd, "bun.lock")) || existsSync(path.join(cwd, "bun.lockb"));
+	return bunFirst
+		? "This repo is Bun-first. Use Bun commands from `AGENTS.md`."
+		: "Use the repo's own package manager, toolchain, and scripts as documented in `AGENTS.md`; do not assume a specific runtime.";
+}
+
+// The architecture learning lens rehearses the *user's* mental model, so it only
+// belongs in phases where a human is present — never in unattended afk/auto workers.
+const HUMAN_PRESENT_PHASES: PhaseWithStatus[] = ["intake", "grill", "prd", "refactors", "slice", "review", "closeout", "status"];
+
 function baseContext(cwd: string, phase: PhaseWithStatus): string {
-	return [
+	const lines = [
 		"You are orchestrating Matt Pocock's AI feature workflow inside pi.",
 		"Keep this phase narrow. Do not jump ahead to later phases.",
 		"Use repo guidance and durable artifacts instead of relying on long conversation context.",
 		"Read relevant context before acting: `AGENTS.md`, `CONTEXT.md`, relevant `docs/adr/*`, relevant directory-level `AGENTS.md`, and any named GitHub issue via `gh issue view <number> --comments`.",
-		"This repo uses GitHub Issues as the durable tracker and labels from `docs/agents/triage-labels.md`.",
-		"This repo is Bun-first. Use Bun commands from `AGENTS.md`.",
+		trackerHint(cwd),
+		toolchainHint(cwd),
 		docsHint(cwd),
 		skillInstructions(phase),
 		augmentationInstructions(phase),
-		architectureLensInstructions(),
-	].join("\n");
+	];
+	if (HUMAN_PRESENT_PHASES.includes(phase)) {
+		lines.push(architectureLensInstructions());
+	}
+	return lines.join("\n");
 }
 
 function phasePrompt(phase: Phase, args: string, cwd: string, routingAddition?: string): string {
@@ -456,7 +483,8 @@ function architectureLensPrompt(args: string, cwd: string): string {
 
 export default function mattWorkflowExtension(pi: ExtensionAPI) {
 	pi.on("resources_discover", async () => {
-		const skillPaths = [workflowSkillPath(), MATT_ENGINEERING_SKILLS_ROOT].filter((skillPathForPi) => existsSync(skillPathForPi));
+		const vendorCategoryPaths = MATT_VENDOR_CATEGORIES.map((category) => path.join(MATT_VENDOR_ROOT, category));
+		const skillPaths = [workflowSkillPath(), ...vendorCategoryPaths].filter((skillPathForPi) => existsSync(skillPathForPi));
 		if (skillPaths.length === 0) return;
 		return { skillPaths };
 	});

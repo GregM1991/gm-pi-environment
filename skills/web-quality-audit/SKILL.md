@@ -165,4 +165,3 @@ When performing an audit, structure findings as:
 For detailed guidelines on specific areas:
 - [Core Web Vitals](../core-web-vitals/SKILL.md)
 - [Accessibility](../accessibility/SKILL.md)
-- [Best Practices](../best-practices/SKILL.md)

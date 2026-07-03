@@ -7,7 +7,7 @@ export const DEFAULT_LIMITS: Required<Limits> = {
 
 export const BASELINE_SKILLS: Record<AgentRole, string[]> = {
 	worker: ["implement", "tdd"],
-	review: [],
+	review: ["code-review"],
 };
 
 export const DEFAULT_SKILLS: SkillRegistryEntry[] = [
@@ -24,6 +24,13 @@ export const DEFAULT_SKILLS: SkillRegistryEntry[] = [
 		compatibility: ["worker", "review"],
 		safety: "allowlisted",
 		resolver: { type: "extension-vendor", relativePath: "tdd/SKILL.md" },
+	},
+	{
+		id: "code-review",
+		title: "Code Review",
+		compatibility: ["review"],
+		safety: "allowlisted",
+		resolver: { type: "extension-vendor", relativePath: "code-review/SKILL.md" },
 	},
 	{
 		id: "diagnosing-bugs",

@@ -2,7 +2,7 @@
 
 ## General Instructions
 
-- Do not auto-commit after work has been completed. Wait for the user to confirm before committing.
+- Do not auto-commit after work has been completed. Wait for the user to confirm before committing. Exception: user-invoked automation loops whose contract explicitly includes committing (such as `/matt-auto` or no-argument `/matt-afk`) may commit per that contract.
 
 ## Context preservation
 

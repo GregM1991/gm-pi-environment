@@ -16,7 +16,7 @@ function writeSkill(root: string, relativePath: string): void {
 }
 
 function writeDefaults(): void {
-	for (const skillId of ["implement", "tdd", "diagnosing-bugs", "codebase-design", "improve-codebase-architecture"]) {
+	for (const skillId of ["implement", "tdd", "code-review", "diagnosing-bugs", "codebase-design", "improve-codebase-architecture"]) {
 		writeSkill(extensionRoot, path.join("vendor", "mattpocock-skills", "engineering", skillId, "SKILL.md"));
 	}
 	for (const skillId of ["accessibility", "react-performance-guidelines", "testing-philosophy", "observability", "security-review"]) {

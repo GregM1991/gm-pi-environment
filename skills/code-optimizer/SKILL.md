@@ -1,17 +1,15 @@
 ---
 name: code-optimizer
 description: >
-  Deep code optimization audit using parallel specialist agents. Each agent hunts for performance
-  anti-patterns, inefficiencies, and suboptimal code using pattern-based detection (Grep/Glob)
-  WITHOUT reading the full source code first — avoiding anchoring bias on existing implementations.
-  Covers ALL optimization domains: database queries, memory leaks, algorithmic complexity,
-  concurrency, bundle size, dead code, I/O & network, rendering/UI, data structures,
-  error handling, caching, build config, security-performance, logging, and infrastructure.
-  Use when asked to: "optimize my code", "find performance issues", "audit code quality",
-  "speed up my app", "find bottlenecks", "code review for performance", "find anti-patterns",
-  "improve code efficiency", "reduce latency", "optimize performance", "code smell detection",
-  "find slow code", "optimize this project", "performance audit", "code optimization".
-  Also triggers on: "optimizar codigo", "encontrar cuellos de botella", "mejorar rendimiento".
+  Deep performance-optimization audit using parallel specialist agents. Each agent hunts for
+  performance anti-patterns, inefficiencies, and suboptimal code using pattern-based detection
+  (Grep/Glob) WITHOUT reading the full source code first — avoiding anchoring bias on existing
+  implementations. Covers performance domains: database queries, memory leaks, algorithmic
+  complexity, concurrency, bundle size, dead code, I/O & network, rendering/UI, data structures,
+  caching, build config, and infrastructure. Performance only — this is not a general code
+  review, quality audit, or bug hunt; use the code-review skill for those. Use when asked to:
+  "optimize my code", "find performance issues", "speed up my app", "find bottlenecks",
+  "reduce latency", "find slow code", "performance audit", "code optimization".
 ---
 
 # Code Optimizer

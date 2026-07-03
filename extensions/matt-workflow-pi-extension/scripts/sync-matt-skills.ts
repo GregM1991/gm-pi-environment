@@ -8,15 +8,16 @@ import { $ } from "bun";
 type SourceMetadata = {
 	repo: string;
 	ref: string;
-	path: string;
+	paths: string[];
 	updatedAt: string;
 };
 
 const REPO = "https://github.com/mattpocock/skills";
-const SOURCE_PATH = "skills/engineering";
+// All upstream categories except deprecated. Local copies of these skills do
+// not belong in the environment's skills/ directory; vendor is canonical.
+const CATEGORIES = ["engineering", "productivity", "misc", "personal", "in-progress"];
 const EXTENSION_ROOT = path.resolve(import.meta.dir, "..");
 const VENDOR_ROOT = path.join(EXTENSION_ROOT, "vendor", "mattpocock-skills");
-const ENGINEERING_DEST = path.join(VENDOR_ROOT, "engineering");
 const SOURCE_JSON = path.join(VENDOR_ROOT, "SOURCE.json");
 
 const args = new Set(Bun.argv.slice(2));
@@ -29,30 +30,34 @@ async function main() {
 	try {
 		await $`git clone --depth 1 ${REPO} ${cloneDir}`.quiet();
 		const ref = (await $`git -C ${cloneDir} rev-parse HEAD`.text()).trim();
-		const sourceDir = path.join(cloneDir, SOURCE_PATH);
 
-		if (!existsSync(sourceDir)) {
-			throw new Error(`Expected upstream path not found: ${SOURCE_PATH}`);
+		const sourcePaths = CATEGORIES.map((category) => `skills/${category}`);
+		const missing = sourcePaths.filter((sourcePath) => !existsSync(path.join(cloneDir, sourcePath)));
+		if (missing.length > 0) {
+			throw new Error(`Expected upstream path(s) not found: ${missing.join(", ")}`);
 		}
 
 		const previous = existsSync(SOURCE_JSON) ? await readFile(SOURCE_JSON, "utf8") : "";
 		const metadata: SourceMetadata = {
 			repo: REPO,
 			ref,
-			path: SOURCE_PATH,
+			paths: sourcePaths,
 			updatedAt: new Date().toISOString(),
 		};
 
 		if (dryRun) {
-			console.log(`Would sync ${REPO}:${SOURCE_PATH}`);
+			console.log(`Would sync ${REPO}: ${sourcePaths.join(", ")}`);
 			console.log(`Upstream HEAD: ${ref}`);
 			if (previous) console.log(`Previous SOURCE.json:\n${previous.trim()}`);
 			return;
 		}
 
 		await mkdir(VENDOR_ROOT, { recursive: true });
-		await rm(ENGINEERING_DEST, { recursive: true, force: true });
-		await cp(sourceDir, ENGINEERING_DEST, { recursive: true });
+		for (const category of CATEGORIES) {
+			const dest = path.join(VENDOR_ROOT, category);
+			await rm(dest, { recursive: true, force: true });
+			await cp(path.join(cloneDir, "skills", category), dest, { recursive: true });
+		}
 
 		const licenseSource = path.join(cloneDir, "LICENSE");
 		if (existsSync(licenseSource)) {
@@ -61,9 +66,10 @@ async function main() {
 
 		await writeFile(SOURCE_JSON, `${JSON.stringify(metadata, null, 2)}\n`);
 
-		console.log(`Synced Matt Pocock engineering skills from ${REPO}`);
+		console.log(`Synced Matt Pocock skills from ${REPO}`);
 		console.log(`Ref: ${ref}`);
-		console.log(`Destination: ${ENGINEERING_DEST}`);
+		console.log(`Categories: ${CATEGORIES.join(", ")}`);
+		console.log(`Destination: ${VENDOR_ROOT}`);
 	} finally {
 		await rm(tempRoot, { recursive: true, force: true });
 	}

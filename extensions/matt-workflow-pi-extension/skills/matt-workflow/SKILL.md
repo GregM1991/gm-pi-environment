@@ -16,15 +16,15 @@ Do not treat this file as the full workflow specification. The extension loads a
 - Do not close or relabel issues unless the user invoked `/matt-closeout`, invoked `/matt-auto`, invoked no-argument `/matt-afk`, or explicitly asked for issue closeout.
 - In auto-loop mode, keep the parent session as orchestrator; implementation and review should run in separate fresh child contexts when subagent tooling is available.
 - Use durable repo context: `AGENTS.md`, `CONTEXT.md`, relevant ADRs, relevant directory `AGENTS.md`, and named GitHub issues.
-- Use GitHub Issues and the labels documented in `docs/agents/triage-labels.md` when tracker work is needed.
+- Use GitHub Issues when tracker work is needed, with the labels documented in `docs/agents/triage-labels.md` when that file exists; otherwise follow the repo's own tracker/label conventions or recommend `setup-matt-pocock-skills`.
 - Treat GitHub milestones as optional human-facing delivery arcs above PRDs: they can group multiple PRD issues and their descendant slice issues, but they do not replace the PRD -> child issue hierarchy and are not readiness state.
 - Do not create, assign, or close milestones unless the user explicitly asks or confirms. `/matt-milestone` is status/review-oriented by default, not implementation-oriented.
 - If a phase prompt lists Matt engineering skills that do not fit the task, skip them and briefly say why.
-- Do not load, read, invoke, or reference non-engineering Matt skills or non-Matt skills while running this workflow unless an issue-aware skill routing contract explicitly selects a registered skill and provides its absolute `SKILL.md` path.
+- Use only skills listed in the current phase prompt or assigned via a skill pack (baseline plus routed skills from an issue-aware skill routing contract, with absolute `SKILL.md` paths). Do not pull in other skills as workflow guidance on your own.
 
 ## Architecture learning lens
 
-The workflow may include lightweight deep-module teaching checkpoints. These are for exercising the user's own mental model, not for turning every target into an architecture review.
+The workflow may include lightweight deep-module teaching checkpoints. These are for exercising the user's own mental model, not for turning every target into an architecture review. They belong only in human-present phases; unattended AFK/auto worker and review sessions have no user to teach and must skip the lens entirely.
 
 Use the architecture terms consistently: **Module**, **Interface**, **Implementation**, **Depth**, **Seam**, **Adapter**, **Leverage**, and **Locality**.
 
