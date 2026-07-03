@@ -3,10 +3,13 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildConventionsContext, formatConventionsDiagnostics, scaffoldConventions } from "./conventions/config";
+import { formatConventionsHints } from "./conventions/hints";
+import type { ConventionsContext } from "./conventions/types";
 import { buildRoutingContext, formatValidationDiagnostics, scaffoldSkillRoutes } from "./skill-routing/config";
 import { formatDryRun, formatRoutingPromptContract, formatSliceSkillHintInstructions } from "./skill-routing/format";
 import { routeIssue } from "./skill-routing/router";
-import type { IssueEvidence, RouteResult, RoutingContext } from "./skill-routing/types";
+import type { IssueEvidence, RouteResult, RoutingContext, ValidationResult } from "./skill-routing/types";
 
 type Phase = "intake" | "grill" | "prd" | "refactors" | "slice" | "afk" | "review" | "closeout" | "auto";
 type PhaseWithStatus = Phase | "status";
@@ -128,13 +131,6 @@ function augmentationPath(ref: AugmentationRef): string {
 	return path.join(AUGMENTATIONS_ROOT, ref.relativePath);
 }
 
-function docsHint(cwd: string): string {
-	const workflowDoc = path.join(cwd, "docs", "agents", "matt-pocock-ai-feature-workflow.md");
-	return existsSync(workflowDoc)
-		? "There is an expanded repo-local workflow doc at `docs/agents/matt-pocock-ai-feature-workflow.md`; consult it only when phase guidance is insufficient."
-		: "No expanded repo-local workflow doc was detected; rely on the phase engineering-skill references below.";
-}
-
 function availableSkills(phase: PhaseWithStatus): Array<SkillRef & { absolutePath: string }> {
 	return PHASE_SKILLS[phase]
 		.map((ref) => ({ ...ref, absolutePath: skillPath(ref) }))
@@ -187,6 +183,13 @@ function architectureLensInstructions(): string {
 
 function routeConfigContext(cwd: string): RoutingContext {
 	return buildRoutingContext(cwd, EXTENSION_ROOT);
+}
+
+function combinedConfigFailure(conventionsContext: ConventionsContext, routingValidation?: ValidationResult): string | undefined {
+	const messages: string[] = [];
+	if (conventionsContext.configExists && !conventionsContext.validation.ok) messages.push(formatConventionsDiagnostics(conventionsContext.validation));
+	if (routingValidation && !routingValidation.ok) messages.push(formatValidationDiagnostics(routingValidation));
+	return messages.length ? messages.join("\n\n") : undefined;
 }
 
 function isGithubIssueTarget(target: string): boolean {
@@ -301,32 +304,17 @@ function routingAwarePromptAddition(phase: Phase, args: string, cwd: string): st
 	return undefined;
 }
 
-function trackerHint(cwd: string): string {
-	return existsSync(path.join(cwd, "docs", "agents", "triage-labels.md"))
-		? "This repo uses GitHub Issues as the durable tracker and labels from `docs/agents/triage-labels.md`."
-		: "Use GitHub Issues as the durable tracker unless repo docs say otherwise. No `docs/agents/triage-labels.md` was detected; follow the repo's own tracker/label conventions, or recommend `setup-matt-pocock-skills` if none exist.";
-}
-
-function toolchainHint(cwd: string): string {
-	const bunFirst = existsSync(path.join(cwd, "bun.lock")) || existsSync(path.join(cwd, "bun.lockb"));
-	return bunFirst
-		? "This repo is Bun-first. Use Bun commands from `AGENTS.md`."
-		: "Use the repo's own package manager, toolchain, and scripts as documented in `AGENTS.md`; do not assume a specific runtime.";
-}
-
 // The architecture learning lens rehearses the *user's* mental model, so it only
 // belongs in phases where a human is present — never in unattended afk/auto workers.
 const HUMAN_PRESENT_PHASES: PhaseWithStatus[] = ["intake", "grill", "prd", "refactors", "slice", "review", "closeout", "status"];
 
-function baseContext(cwd: string, phase: PhaseWithStatus): string {
+function baseContext(cwd: string, phase: PhaseWithStatus, conventionsContext = buildConventionsContext(cwd)): string {
 	const lines = [
 		"You are orchestrating Matt Pocock's AI feature workflow inside pi.",
 		"Keep this phase narrow. Do not jump ahead to later phases.",
 		"Use repo guidance and durable artifacts instead of relying on long conversation context.",
 		"Read relevant context before acting: `AGENTS.md`, `CONTEXT.md`, relevant `docs/adr/*`, relevant directory-level `AGENTS.md`, and any named GitHub issue via `gh issue view <number> --comments`.",
-		trackerHint(cwd),
-		toolchainHint(cwd),
-		docsHint(cwd),
+		...formatConventionsHints(conventionsContext, cwd),
 		skillInstructions(phase),
 		augmentationInstructions(phase),
 	];
@@ -336,9 +324,9 @@ function baseContext(cwd: string, phase: PhaseWithStatus): string {
 	return lines.join("\n");
 }
 
-function phasePrompt(phase: Phase, args: string, cwd: string, routingAddition?: string): string {
+function phasePrompt(phase: Phase, args: string, cwd: string, routingAddition?: string, conventionsContext = buildConventionsContext(cwd)): string {
 	const target = args.trim() || "the current user request / active issue";
-	const base = baseContext(cwd, phase);
+	const base = baseContext(cwd, phase, conventionsContext);
 	const routing = routingAddition ? `\n\n${routingAddition}` : "";
 
 	const prompts: Record<Phase, string> = {
@@ -371,6 +359,7 @@ function helpText(): string {
 		"  /matt-auto [filter|parent]  Continuously implement, review, commit, and close ready-for-agent issues; parent issues expand to child issues",
 		"  /matt-route-skills <issue> Read-only dry run of issue-aware skill routing",
 		"  /matt-init-skill-routes    Scaffold .pi/matt-skill-routes.json without overwriting",
+		"  /matt-init-conventions     Scaffold .pi/matt-conventions.json without overwriting",
 		"  /matt-review <diff|issue>   Fresh-context review",
 		"  /matt-closeout <issue>      Verify completion evidence, comment, and close/relabel an issue",
 		"  /matt-status                Show workflow status/checklist",
@@ -402,14 +391,14 @@ function skillsText(phase?: PhaseWithStatus): string {
 		.join("\n\n");
 }
 
-function statusPrompt(cwd: string): string {
-	return `${baseContext(cwd, "status")}\n\nPhase: STATUS.\n\nUse applicable Matt engineering skill files above. Inspect the current repo/session state enough to summarize Matt workflow progress. Check for relevant GitHub issue references in the conversation if available, changed files, docs/features artifacts, labels, and GitHub milestone association if a target issue is obvious. If a target issue belongs to a milestone, summarize milestone-level progress without treating the milestone as the source of parent/child hierarchy: open/closed PRDs, open/closed child issues when discoverable from PRD child sections, blockers, orphan milestone issues, and whether the milestone looks close to wrap-up. Output a compact checklist across phases: intake, grill, PRD, slice, AFK, review, closeout, auto-loop, milestone/delivery-arc status, durable-doc updates. Do not implement.`;
+function statusPrompt(cwd: string, conventionsContext = buildConventionsContext(cwd)): string {
+	return `${baseContext(cwd, "status", conventionsContext)}\n\nPhase: STATUS.\n\nUse applicable Matt engineering skill files above. Inspect the current repo/session state enough to summarize Matt workflow progress. Check for relevant GitHub issue references in the conversation if available, changed files, docs/features artifacts, labels, and GitHub milestone association if a target issue is obvious. If a target issue belongs to a milestone, summarize milestone-level progress without treating the milestone as the source of parent/child hierarchy: open/closed PRDs, open/closed child issues when discoverable from PRD child sections, blockers, orphan milestone issues, and whether the milestone looks close to wrap-up. Output a compact checklist across phases: intake, grill, PRD, slice, AFK, review, closeout, auto-loop, milestone/delivery-arc status, durable-doc updates. Do not implement.`;
 }
 
-function milestonePrompt(args: string, cwd: string): string {
+function milestonePrompt(args: string, cwd: string, conventionsContext = buildConventionsContext(cwd)): string {
 	const target = args.trim() || "the current repo milestones / active delivery arc";
 	return [
-		baseContext(cwd, "status"),
+		baseContext(cwd, "status", conventionsContext),
 		"",
 		"Phase: MILESTONE STATUS / DELIVERY ARC REVIEW.",
 		"",
@@ -430,10 +419,10 @@ function milestonePrompt(args: string, cwd: string): string {
 	].join("\n");
 }
 
-function architectureGymPrompt(args: string, cwd: string): string {
+function architectureGymPrompt(args: string, cwd: string, conventionsContext = buildConventionsContext(cwd)): string {
 	const target = args.trim() || "the current issue / active feature / recent workflow context";
 	return [
-		baseContext(cwd, "grill"),
+		baseContext(cwd, "grill", conventionsContext),
 		"",
 		"Mode: ARCHITECTURE GYM.",
 		"",
@@ -458,10 +447,10 @@ function architectureGymPrompt(args: string, cwd: string): string {
 	].join("\n");
 }
 
-function architectureLensPrompt(args: string, cwd: string): string {
+function architectureLensPrompt(args: string, cwd: string, conventionsContext = buildConventionsContext(cwd)): string {
 	const target = args.trim() || "the current issue / active feature / recent workflow context";
 	return [
-		baseContext(cwd, "grill"),
+		baseContext(cwd, "grill", conventionsContext),
 		"",
 		"Mode: QUICK ARCHITECTURE LENS.",
 		"",
@@ -546,11 +535,25 @@ export default function mattWorkflowExtension(pi: ExtensionAPI) {
 		},
 	});
 
+	pi.registerCommand("matt-init-conventions", {
+		description: "Scaffold .pi/matt-conventions.json without overwriting",
+		handler: async (_args, ctx) => {
+			const result = scaffoldConventions(ctx.cwd);
+			ctx.ui.notify(result.message, "info");
+		},
+	});
+
 	pi.registerCommand("matt-status", {
 		description: "Ask the agent to summarize current workflow phase/status",
 		handler: async (_args, ctx) => {
+			const conventionsContext = buildConventionsContext(ctx.cwd);
+			const failure = combinedConfigFailure(conventionsContext);
+			if (failure) {
+				ctx.ui.notify(failure, "info");
+				return;
+			}
 			pi.appendEntry(`${EXTENSION_NAME}:phase`, { phase: "status", at: Date.now() });
-			pi.sendUserMessage(statusPrompt(ctx.cwd));
+			pi.sendUserMessage(statusPrompt(ctx.cwd, conventionsContext));
 		},
 	});
 
@@ -562,8 +565,14 @@ export default function mattWorkflowExtension(pi: ExtensionAPI) {
 			return filtered.length ? filtered.map((value) => ({ value, label: value })) : null;
 		},
 		handler: async (args, ctx) => {
+			const conventionsContext = buildConventionsContext(ctx.cwd);
+			const failure = combinedConfigFailure(conventionsContext);
+			if (failure) {
+				ctx.ui.notify(failure, "info");
+				return;
+			}
 			pi.appendEntry(`${EXTENSION_NAME}:phase`, { phase: "milestone", args: args.trim(), at: Date.now() });
-			pi.sendUserMessage(milestonePrompt(args, ctx.cwd));
+			pi.sendUserMessage(milestonePrompt(args, ctx.cwd, conventionsContext));
 		},
 	});
 
@@ -575,8 +584,14 @@ export default function mattWorkflowExtension(pi: ExtensionAPI) {
 			return filtered.length ? filtered.map((value) => ({ value, label: value })) : null;
 		},
 		handler: async (args, ctx) => {
+			const conventionsContext = buildConventionsContext(ctx.cwd);
+			const failure = combinedConfigFailure(conventionsContext);
+			if (failure) {
+				ctx.ui.notify(failure, "info");
+				return;
+			}
 			pi.appendEntry(`${EXTENSION_NAME}:phase`, { phase: "architecture-lens", args: args.trim(), at: Date.now() });
-			pi.sendUserMessage(architectureLensPrompt(args, ctx.cwd));
+			pi.sendUserMessage(architectureLensPrompt(args, ctx.cwd, conventionsContext));
 		},
 	});
 
@@ -588,8 +603,14 @@ export default function mattWorkflowExtension(pi: ExtensionAPI) {
 			return filtered.length ? filtered.map((value) => ({ value, label: value })) : null;
 		},
 		handler: async (args, ctx) => {
+			const conventionsContext = buildConventionsContext(ctx.cwd);
+			const failure = combinedConfigFailure(conventionsContext);
+			if (failure) {
+				ctx.ui.notify(failure, "info");
+				return;
+			}
 			pi.appendEntry(`${EXTENSION_NAME}:phase`, { phase: "architecture-gym", args: args.trim(), at: Date.now() });
-			pi.sendUserMessage(architectureGymPrompt(args, ctx.cwd));
+			pi.sendUserMessage(architectureGymPrompt(args, ctx.cwd, conventionsContext));
 		},
 	});
 
@@ -602,13 +623,15 @@ export default function mattWorkflowExtension(pi: ExtensionAPI) {
 				return filtered.length ? filtered.map((value) => ({ value, label: value })) : null;
 			},
 			handler: async (args, ctx) => {
+				const conventionsContext = buildConventionsContext(ctx.cwd);
 				const routingContext = routeAware ? routeConfigContext(ctx.cwd) : undefined;
-				if (routingContext && !routingContext.validation.ok) {
-					ctx.ui.notify(formatValidationDiagnostics(routingContext.validation), "info");
+				const failure = combinedConfigFailure(conventionsContext, routingContext?.validation);
+				if (failure) {
+					ctx.ui.notify(failure, "info");
 					return;
 				}
 				const routingAddition = routeAware ? routingAwarePromptAddition(phase, args, ctx.cwd) : undefined;
-				const prompt = phasePrompt(phase, args, ctx.cwd, routingAddition);
+				const prompt = phasePrompt(phase, args, ctx.cwd, routingAddition, conventionsContext);
 				pi.appendEntry(`${EXTENSION_NAME}:phase`, { phase, args: args.trim(), at: Date.now() });
 
 				if (fresh) {
@@ -641,9 +664,11 @@ export default function mattWorkflowExtension(pi: ExtensionAPI) {
 		handler: async (args, ctx) => {
 			const trimmedArgs = args.trim();
 			const phase: Phase = trimmedArgs ? "afk" : "auto";
+			const conventionsContext = buildConventionsContext(ctx.cwd);
 			const routingContext = routeConfigContext(ctx.cwd);
-			if (!routingContext.validation.ok) {
-				ctx.ui.notify(formatValidationDiagnostics(routingContext.validation), "info");
+			const failure = combinedConfigFailure(conventionsContext, routingContext.validation);
+			if (failure) {
+				ctx.ui.notify(failure, "info");
 				return;
 			}
 			const routed = trimmedArgs && isGithubIssueTarget(trimmedArgs) ? routeGithubIssueTarget(trimmedArgs, ctx.cwd) : undefined;
@@ -655,7 +680,7 @@ export default function mattWorkflowExtension(pi: ExtensionAPI) {
 				ctx.ui.notify(formatDryRun(routed.result), "info");
 				return;
 			}
-			const prompt = phasePrompt(phase, trimmedArgs, ctx.cwd, routed?.ok ? formatRoutingPromptContract(routed.result) : routingAwarePromptAddition(phase, trimmedArgs, ctx.cwd));
+			const prompt = phasePrompt(phase, trimmedArgs, ctx.cwd, routed?.ok ? formatRoutingPromptContract(routed.result) : routingAwarePromptAddition(phase, trimmedArgs, ctx.cwd), conventionsContext);
 			pi.appendEntry(`${EXTENSION_NAME}:phase`, { phase, args: trimmedArgs, at: Date.now() });
 
 			if (!trimmedArgs) {
@@ -678,8 +703,14 @@ export default function mattWorkflowExtension(pi: ExtensionAPI) {
 	pi.registerCommand("matt-next", {
 		description: "Choose the next Matt workflow phase interactively",
 		handler: async (args, ctx) => {
+			const conventionsContext = buildConventionsContext(ctx.cwd);
+			const failure = combinedConfigFailure(conventionsContext);
+			if (failure) {
+				ctx.ui.notify(failure, "info");
+				return;
+			}
 			if (!ctx.hasUI) {
-				pi.sendUserMessage(phasePrompt("intake", args, ctx.cwd));
+				pi.sendUserMessage(phasePrompt("intake", args, ctx.cwd, undefined, conventionsContext));
 				return;
 			}
 
@@ -690,7 +721,7 @@ export default function mattWorkflowExtension(pi: ExtensionAPI) {
 
 			if (!choice) return;
 			const phase = choice.split(" — ")[0] as Phase;
-			const prompt = phasePrompt(phase, args, ctx.cwd);
+			const prompt = phasePrompt(phase, args, ctx.cwd, undefined, conventionsContext);
 			pi.appendEntry(`${EXTENSION_NAME}:phase`, { phase, args: args.trim(), at: Date.now() });
 
 			if (phase === "afk" || phase === "review") {

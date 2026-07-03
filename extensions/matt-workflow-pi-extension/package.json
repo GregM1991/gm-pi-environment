@@ -17,6 +17,7 @@
   "files": [
     "index.ts",
     "skill-routing/**/*",
+    "conventions/**/*",
     "skills/**/*",
     "augmentations/**/*",
     "vendor/**/*",
@@ -25,8 +26,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "check": "bun --check index.ts scripts/sync-matt-skills.ts skill-routing/*.ts",
-    "test": "bun test skill-routing/*.test.ts",
+    "check": "bun --check index.ts scripts/sync-matt-skills.ts skill-routing/*.ts conventions/*.ts",
+    "test": "bun test skill-routing/*.test.ts conventions/*.test.ts",
     "sync:matt-skills": "bun scripts/sync-matt-skills.ts",
     "sync:matt-skills:dry-run": "bun scripts/sync-matt-skills.ts --dry-run"
   },

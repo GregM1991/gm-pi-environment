@@ -16,6 +16,7 @@ The extension is intentionally thin: it loads the `matt-workflow` orchestrator s
 - `/matt-auto [filter|parent]` — continuously implement, review, commit, and close ready-for-agent issues until blocked; when passed a parent/PRD issue, expands it into child issues and stops after the child queue is complete
 - `/matt-route-skills <GitHub issue>` — read-only dry run that validates skill-routing config, fetches the issue with `gh`, and explains worker/review packs
 - `/matt-init-skill-routes` — scaffold `.pi/matt-skill-routes.json` only, refusing to overwrite an existing config
+- `/matt-init-conventions` — scaffold `.pi/matt-conventions.json` only, refusing to overwrite an existing config
 - `/matt-review <diff|issue>` — fresh-context review
 - `/matt-closeout <issue>` — verify completion evidence, draft/post completion comment, and close or relabel an issue
 - `/matt-next <target>` — interactive phase picker
@@ -124,6 +125,40 @@ Use `/matt-arch-gym [target]` for interactive reps. The agent picks a small repo
 ```
 
 Normal phase prompts also carry a lightweight reminder to use this lens only when architecture-sensitive, and to keep checkpoints short unless the user asks to go deeper.
+
+## Repo conventions config
+
+Commands that inject base phase context can read optional strict repo JSON at `.pi/matt-conventions.json` (`version: 1`). This file is a sibling to `.pi/matt-skill-routes.json`; it controls repo convention hints, not skill routing.
+
+Config shape:
+
+```json
+{
+  "version": 1,
+  "tracker": {
+    "type": "github-issues",
+    "labelsDocPath": "docs/agents/triage-labels.md"
+  },
+  "toolchain": {
+    "runtime": "bun",
+    "commands": {
+      "test": "bun test",
+      "check": "bun run check",
+      "build": "bun run build"
+    }
+  },
+  "docs": {
+    "workflowDocPath": "docs/agents/matt-pocock-ai-feature-workflow.md",
+    "extraContextDocs": []
+  }
+}
+```
+
+All sections are optional except `version`. If the file is absent, existing detection runs. If the file is present and valid, configured sections win and omitted sections fall back to detection independently. If the file exists but is invalid, every command that would send a base-context phase prompt hard-stops with diagnostics instead of silently falling back.
+
+Doc paths must be repo-relative local paths, must stay inside the repo, and must exist on disk. `tracker.type` supports only `github-issues` in v1. Toolchain commands are hint-only; agents see them as preferred verification commands, but the extension does not execute them automatically.
+
+Use `/matt-init-conventions` to create the scaffold without overwriting an existing file.
 
 ## Issue-aware skill routing
 
