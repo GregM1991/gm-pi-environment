@@ -1,7 +1,12 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildRoutingContext, formatValidationDiagnostics, scaffoldSkillRoutes } from "./skill-routing/config";
+import { formatDryRun, formatRoutingPromptContract, formatSliceSkillHintInstructions } from "./skill-routing/format";
+import { routeIssue } from "./skill-routing/router";
+import type { IssueEvidence, RouteResult, RoutingContext } from "./skill-routing/types";
 
 type Phase = "intake" | "grill" | "prd" | "refactors" | "slice" | "afk" | "review" | "closeout" | "auto";
 type PhaseWithStatus = Phase | "status";
@@ -173,6 +178,122 @@ function architectureLensInstructions(): string {
 	].join("\n");
 }
 
+function routeConfigContext(cwd: string): RoutingContext {
+	return buildRoutingContext(cwd, EXTENSION_ROOT);
+}
+
+function isGithubIssueTarget(target: string): boolean {
+	return /^#?\d+$/.test(target.trim()) || /^https:\/\/github\.com\/[^\s/]+\/[^\s/]+\/issues\/\d+\b/.test(target.trim());
+}
+
+function normalizeGithubIssueTarget(target: string): string {
+	const trimmed = target.trim();
+	return /^#\d+$/.test(trimmed) ? trimmed.slice(1) : trimmed;
+}
+
+function extractExplicitIssuePaths(...texts: string[]): string[] {
+	const paths = new Set<string>();
+	const pathLike = /(?:^|[\s([{`"'=])((?:\.{1,2}\/)?(?:[A-Za-z0-9_.-]+\/)+[A-Za-z0-9_.-]+|[A-Za-z0-9_.-]+\.(?:ts|tsx|js|jsx|mjs|cjs|json|md|mdx|css|scss|html|yml|yaml|toml|rs|go|py|rb|java|kt|swift|php|cs|cpp|c|h|sql|graphql|sh|bash|zsh|fish))(?=$|[\s)\]},.;:'"`])/g;
+	for (const text of texts) {
+		for (const match of text.matchAll(pathLike)) {
+			const candidate = match[1];
+			if (!candidate || candidate.includes("://") || candidate.length > 200) continue;
+			paths.add(candidate.replace(/^\.\//, ""));
+			if (paths.size >= 50) return [...paths];
+		}
+	}
+	return [...paths];
+}
+
+type FetchIssueResult = { ok: true; issue: IssueEvidence } | { ok: false; message: string };
+
+function fetchGithubIssue(target: string, cwd: string): FetchIssueResult {
+	const normalizedTarget = normalizeGithubIssueTarget(target);
+	if (!isGithubIssueTarget(normalizedTarget)) {
+		return { ok: false, message: "Expected a GitHub issue number, #number, or issue URL." };
+	}
+	const result = spawnSync("gh", ["issue", "view", normalizedTarget, "--json", "number,url,title,body,labels"], {
+		cwd,
+		encoding: "utf8",
+	});
+	if (result.status !== 0) {
+		const stderr = result.stderr?.trim();
+		return { ok: false, message: stderr || `gh issue view failed for ${target}.` };
+	}
+	try {
+		const parsed = JSON.parse(result.stdout) as {
+			number?: number;
+			url?: string;
+			title?: string;
+			body?: string;
+			labels?: Array<{ name?: string } | string>;
+		};
+		const title = parsed.title ?? "";
+		const body = parsed.body ?? "";
+		return {
+			ok: true,
+			issue: {
+				number: parsed.number,
+				url: parsed.url,
+				title,
+				body,
+				labels: (parsed.labels ?? []).map((label) => (typeof label === "string" ? label : label.name ?? "")).filter((label) => label.length > 0),
+				paths: extractExplicitIssuePaths(title, body),
+			},
+		};
+	} catch (error) {
+		return { ok: false, message: `Failed to parse gh issue JSON: ${error instanceof Error ? error.message : String(error)}` };
+	}
+}
+
+function routeGithubIssueTarget(target: string, cwd: string): { ok: true; result: RouteResult } | { ok: false; message: string; fetched?: false } {
+	const routingContext = routeConfigContext(cwd);
+	if (!routingContext.validation.ok) {
+		return { ok: false, fetched: false, message: formatValidationDiagnostics(routingContext.validation) };
+	}
+	const issue = fetchGithubIssue(target, cwd);
+	if (!issue.ok) return { ok: false, message: issue.message };
+	return { ok: true, result: routeIssue(routingContext, issue.issue) };
+}
+
+// Queue-targeted `/matt-auto` and `/matt-afk <label>` select the concrete issue inside
+// the prompt-driven loop, so v1 documents and prompts the required per-issue routing
+// hard stop there instead of claiming the extension can pre-route unresolved queues.
+function routingAwarePromptAddition(phase: Phase, args: string, cwd: string): string | undefined {
+	if (phase === "slice") {
+		const routingContext = routeConfigContext(cwd);
+		return formatSliceSkillHintInstructions(routingContext.validation);
+	}
+	if (phase === "afk" && isGithubIssueTarget(args.trim())) {
+		const routed = routeGithubIssueTarget(args.trim(), cwd);
+		if (routed.ok) return formatRoutingPromptContract(routed.result);
+		return undefined;
+	}
+	if (phase === "afk") {
+		return [
+			"Issue-aware skill routing contract:",
+			"- Route config was validated before this AFK prompt was sent.",
+			"- This prompt-driven label/filter flow discovers the concrete issue after command launch; the extension cannot precompute a pack until a specific GitHub issue is selected.",
+			"- Before implementation, select exactly one open ready-for-agent issue, fetch it with `gh issue view <number> --json number,url,title,body,labels`, include explicit file-like title/body paths as path evidence, then run the same route computation used by `/matt-route-skills`.",
+			"- Stop before implementation on invalid routing config, missing routed skills, or high-confidence routed-skill overflow. Medium-confidence overflow may be trimmed to the cap.",
+			"- Worker/review child contracts must include selected skill IDs, absolute SKILL.md paths, evidence-backed rationale, and mandatory upfront guidance to read selected skill files before acting.",
+			"- Ask workers for only a compact `Skill adjustments` line (`none` when unchanged); do not add audit ceremony and do not name skills in commits or closeout comments.",
+		].join("\n");
+	}
+	if (phase === "auto") {
+		return [
+			"Issue-aware skill routing contract:",
+			"- Route config was validated before this auto loop prompt was sent.",
+			"- This prompt-driven queue flow discovers the next concrete issue after command launch; the extension does not change queue ordering and cannot precompute every per-issue pack before the queue is resolved.",
+			"- For each selected child/work issue, fetch the issue with `gh issue view <number> --json number,url,title,body,labels`, include explicit file-like title/body paths as path evidence, and route that selected issue before launching worker or review agents.",
+			"- If routing validation fails for the selected issue, a selected routed skill is missing, or high-confidence routed skills exceed the active cap, do not launch implementation/review; report the routing stop reason in the compact final loop log. Medium-confidence overflow may be trimmed to the cap.",
+			"- Worker/review child contracts must include selected skill IDs, absolute SKILL.md paths, evidence-backed rationale, and mandatory upfront guidance to read selected skill files before acting.",
+			"- Ask workers for only a compact `Skill adjustments` line (`none` when unchanged); do not add audit ceremony and do not name skills in commits or closeout comments.",
+		].join("\n");
+	}
+	return undefined;
+}
+
 function baseContext(cwd: string, phase: PhaseWithStatus): string {
 	return [
 		"You are orchestrating Matt Pocock's AI feature workflow inside pi.",
@@ -188,21 +309,22 @@ function baseContext(cwd: string, phase: PhaseWithStatus): string {
 	].join("\n");
 }
 
-function phasePrompt(phase: Phase, args: string, cwd: string): string {
+function phasePrompt(phase: Phase, args: string, cwd: string, routingAddition?: string): string {
 	const target = args.trim() || "the current user request / active issue";
 	const base = baseContext(cwd, phase);
+	const routing = routingAddition ? `\n\n${routingAddition}` : "";
 
 	const prompts: Record<Phase, string> = {
-		intake: `${base}\n\nPhase: INTAKE.\n\nTarget: ${target}\n\nUse the applicable Matt engineering skill files above. Find the source brief/issue and gather only enough repo context to decide the next workflow step. If this is a GitHub issue, inspect it and its comments. Report: source, current labels/status, missing context, recommended next phase, and whether it is human-in-loop or AFK-safe. Do not implement.`,
-		grill: `${base}\n\nPhase: GRILL / ALIGNMENT.\n\nTarget: ${target}\n\nUse the applicable Matt engineering skill files above. Interview the user until there is shared understanding, using grill-with-docs when this is codebase work. Maintain a top-level repo-local \`MATT-GRILL-NOTES.md\` scratch document lazily after the first answered question or out-of-scope refactor finding: append Q&A decisions only, and update/group potential refactors that are outside the PRD scope. Do not write a PRD or implementation plan until major ambiguity is gone.`,
-		prd: `${base}\n\nPhase: PRD / DESTINATION DOCUMENT.\n\nTarget: ${target}\n\nUse the applicable Matt engineering skill files above. Turn resolved context into a concise PRD/delivery brief or tracker PRD, following the selected skill. Milestones are optional human-facing delivery arcs above PRDs; they do not replace the PRD -> child issue hierarchy. If the user mentions a release, delivery arc, feature direction, or milestone, ask whether this PRD should be associated with an existing GitHub milestone or a newly confirmed milestone. Do not create a milestone unless the user explicitly asks or confirms; if creating one, use gh/GitHub after confirming the exact title and optional due date. If publishing or updating a PRD issue and the milestone is confirmed, apply it to the PRD issue and note the association in the PRD body. Use \`MATT-GRILL-NOTES.md\` if present for durable Q&A decisions, but do not include out-of-scope refactor candidates in the PRD. After the PRD is complete, recommend the formal refactor-review phase before slicing. Do not implement.`,
-		refactors: `${base}\n\nPhase: POST-PRD REFACTOR EXTRACTION REVIEW.\n\nTarget: ${target}\n\nUse the applicable Matt engineering skill files above. Read the completed PRD/issue and the top-level \`MATT-GRILL-NOTES.md\` scratch document if present. Review only the potential refactors that are outside the PRD scope. Walk the user through them quickly with context, ask which should become GitHub issues, create approved issues using the repo tracker conventions and labels, then ask for explicit confirmation before deleting \`MATT-GRILL-NOTES.md\`. Do not move into slicing until the user has been prompted about deletion. Do not implement.`,
-		slice: `${base}\n\nPhase: VERTICAL-SLICE ISSUE DECOMPOSITION.\n\nTarget: ${target}\n\nUse the applicable Matt engineering skill files above. Before slicing, check whether top-level \`MATT-GRILL-NOTES.md\` exists. If it exists and the user has not completed refactor extraction/deletion confirmation, stop and direct them to the post-PRD refactor extraction review. Otherwise break the PRD into independently grabbable vertical tracer-bullet issues. Avoid horizontal database/API/UI phases. Keep dependency order explicit and recommend readiness labels. If the source is an existing GitHub parent/PRD issue, inspect whether it has a milestone. If it does, child slice issues should inherit that milestone unless the user says otherwise; if milestone inheritance is unclear, ask before creating issues. If the user explicitly names a milestone for slicing, check whether it exists; ask before creating a missing milestone, then apply the confirmed milestone to the child issues. Milestones are delivery grouping only, not the source of slice hierarchy. If you create child issues from a parent/PRD issue, update the parent issue after creation with a predictable \`## Child issues\` section that lists each child issue number/link, one-line purpose, readiness label recommendation, milestone if applied, and any dependency/blocker relationship such as \`blocked by #123\`. Preserve existing parent content where possible; replace an existing generated \`## Child issues\` section instead of duplicating it. Do not implement.`,
+		intake: `${base}${routing}\n\nPhase: INTAKE.\n\nTarget: ${target}\n\nUse the applicable Matt engineering skill files above. Find the source brief/issue and gather only enough repo context to decide the next workflow step. If this is a GitHub issue, inspect it and its comments. Report: source, current labels/status, missing context, recommended next phase, and whether it is human-in-loop or AFK-safe. Do not implement.`,
+		grill: `${base}${routing}\n\nPhase: GRILL / ALIGNMENT.\n\nTarget: ${target}\n\nUse the applicable Matt engineering skill files above. Interview the user until there is shared understanding, using grill-with-docs when this is codebase work. Maintain a top-level repo-local \`MATT-GRILL-NOTES.md\` scratch document lazily after the first answered question or out-of-scope refactor finding: append Q&A decisions only, and update/group potential refactors that are outside the PRD scope. Do not write a PRD or implementation plan until major ambiguity is gone.`,
+		prd: `${base}${routing}\n\nPhase: PRD / DESTINATION DOCUMENT.\n\nTarget: ${target}\n\nUse the applicable Matt engineering skill files above. Turn resolved context into a concise PRD/delivery brief or tracker PRD, following the selected skill. Milestones are optional human-facing delivery arcs above PRDs; they do not replace the PRD -> child issue hierarchy. If the user mentions a release, delivery arc, feature direction, or milestone, ask whether this PRD should be associated with an existing GitHub milestone or a newly confirmed milestone. Do not create a milestone unless the user explicitly asks or confirms; if creating one, use gh/GitHub after confirming the exact title and optional due date. If publishing or updating a PRD issue and the milestone is confirmed, apply it to the PRD issue and note the association in the PRD body. Use \`MATT-GRILL-NOTES.md\` if present for durable Q&A decisions, but do not include out-of-scope refactor candidates in the PRD. After the PRD is complete, recommend the formal refactor-review phase before slicing. Do not implement.`,
+		refactors: `${base}${routing}\n\nPhase: POST-PRD REFACTOR EXTRACTION REVIEW.\n\nTarget: ${target}\n\nUse the applicable Matt engineering skill files above. Read the completed PRD/issue and the top-level \`MATT-GRILL-NOTES.md\` scratch document if present. Review only the potential refactors that are outside the PRD scope. Walk the user through them quickly with context, ask which should become GitHub issues, create approved issues using the repo tracker conventions and labels, then ask for explicit confirmation before deleting \`MATT-GRILL-NOTES.md\`. Do not move into slicing until the user has been prompted about deletion. Do not implement.`,
+		slice: `${base}${routing}\n\nPhase: VERTICAL-SLICE ISSUE DECOMPOSITION.\n\nTarget: ${target}\n\nUse the applicable Matt engineering skill files above. Before slicing, check whether top-level \`MATT-GRILL-NOTES.md\` exists. If it exists and the user has not completed refactor extraction/deletion confirmation, stop and direct them to the post-PRD refactor extraction review. Otherwise break the PRD into independently grabbable vertical tracer-bullet issues. Avoid horizontal database/API/UI phases. Keep dependency order explicit and recommend readiness labels. If the source is an existing GitHub parent/PRD issue, inspect whether it has a milestone. If it does, child slice issues should inherit that milestone unless the user says otherwise; if milestone inheritance is unclear, ask before creating issues. If the user explicitly names a milestone for slicing, check whether it exists; ask before creating a missing milestone, then apply the confirmed milestone to the child issues. Milestones are delivery grouping only, not the source of slice hierarchy. If you create child issues from a parent/PRD issue, update the parent issue after creation with a predictable \`## Child issues\` section that lists each child issue number/link, one-line purpose, readiness label recommendation, milestone if applied, and any dependency/blocker relationship such as \`blocked by #123\`. Preserve existing parent content where possible; replace an existing generated \`## Child issues\` section instead of duplicating it. Do not implement.`,
 
-		afk: `${base}\n\nPhase: AFK IMPLEMENTATION LOOP.\n\nTarget: ${target}\n\nUse the applicable Matt engineering skill files above. Work only on unblocked ready-for-agent issues. Start from the issue and repo docs, explore minimally, use TDD where practical, implement the smallest passing slice, and run fresh verification before claiming completion. If no unblocked ready-for-agent issue exists, stop and say so.`,
-		review: `${base}\n\nPhase: FRESH-CONTEXT REVIEW.\n\nTarget: ${target}\n\nUse the applicable Matt engineering skill files above. Review from a fresh context using the issue/PRD, current diff, AGENTS.md, CONTEXT.md, and relevant ADRs as the standard. Produce file:line findings with severity and concrete fixes. Do not silently fix unless asked.`,
-		closeout: `${base}\n\nPhase: ISSUE CLOSEOUT.\n\nTarget: ${target}\n\nUse the applicable Matt engineering skill files above. Close out only a specifically named issue or PRD target. Inspect the full issue with comments, current labels, milestone, acceptance criteria, current diff/commits, and fresh verification/review evidence. If the issue is a PRD/container, discover child issues from the generated child section or linked issue metadata and do not recommend closing the PRD until its child issues are complete or explicitly moved out of scope. If implementation and review evidence satisfy the issue, draft a concise completion comment that starts with the triage disclaimer required by the triage skill, summarize what changed and how it was verified, then ask for confirmation before posting or closing unless the user explicitly asked you to close it now. If the issue belongs to a milestone, report whether that milestone now appears complete, still has open PRDs/child work, or needs human cleanup; do not close the milestone unless the user explicitly asks and confirms. If evidence is missing, do not close; recommend the next state such as ready-for-agent, needs-info, or ready-for-human with the reason. Do not implement. Do not commit.`,
-		auto: `${base}\n\nPhase: CONTINUOUS AFK AUTO-LOOP.\n\nTarget/filter: ${target}\n\nYou are the parent orchestrator. Use the applicable Matt engineering skill files above for issue queue state, worker contracts, review standards, and closeout decisions. If the Pi subagent extension/tooling is available, use it to launch fresh-context child agents; do not make child agents run their own subagent workflows. Do not use parallel execution or worktrees unless the user explicitly asks for it in this run.\n\nLoop contract:\n1. Before starting, inspect git status. If the worktree is dirty in a way not attributable to a just-finished loop iteration, stop and report it.\n2. Resolve the target/filter into a work queue:\n   - If no explicit target/filter is supplied, query open GitHub issues labeled ready-for-agent.\n   - If the target/filter names a specific GitHub issue or issue URL, inspect that issue and its comments first. If it is a parent/PRD/container issue, do not implement or close the parent. Instead, discover its child issues and build the queue from those children.\n   - Treat an issue as a parent when it contains a PRD, a child/sub-issues section, a task list of issue references, explicit 'parent', 'epic', or 'container' wording, or comments/metadata from slicing that identify child issues. Prefer explicit child issue references in the parent body/comments; otherwise use GitHub sub-issue metadata when available; only then fall back to linked issues, shared milestone, or labels if the relationship is clear.\n   - A milestone is not a parent issue and shared milestone membership must not be used by itself to infer PRD/child hierarchy. If the target/filter names a GitHub milestone, treat it only as a queue filter over open ready-for-agent issues in that milestone; do not implement PRD/container issues, and stop if milestone membership does not make the work relationship clear.\n   - If parent detection is ambiguous, stop and report what needs human clarification instead of implementing the parent.\n3. Filter the queue to open, unblocked, ready-for-agent child/work issues. Order oldest first unless dependency/blocker text says otherwise. Respect blocker labels and issue text such as 'blocked by #123', task-list dependencies, and acceptance criteria dependencies.\n4. Stop when there are no unblocked ready-for-agent issues in the active queue, when the next issue is labeled needs-info/ready-for-human/wontfix or otherwise requires human review, when label state conflicts, or when all child issues for a parent target are complete. If parent-targeted auto mode completes every child, stop and report that the parent workflow can continue to the next phase; do not close the parent automatically.\n5. For each selected issue, launch a fresh implementation child with a concrete contract: implement exactly that child/work issue, keep scope minimal, use TDD where practical, verify, and return changed files plus verification evidence.\n6. Launch a separate fresh review child against the issue, implementation diff/commit, and verification evidence. Require file:line findings and a pass/fix/blocker outcome.\n7. If review returns small concrete fixable findings, allow at most one worker fix pass and one follow-up review. Stop on non-trivial design questions, unclear acceptance criteria, failed verification, merge/conflict risk, or human judgment.\n8. After review passes, create one commit for that issue if there are uncommitted changes for it. Use a conventional commit message referencing the issue. Do not combine multiple issues in one commit.\n9. Run closeout logic for that issue: post an AI-generated completion comment using the triage disclaimer, summarize changes and verification, and close the child/work issue only when evidence supports it. If evidence does not support closeout, do not close; relabel/recommend the correct next state and stop.\n10. Continue serially with the next unblocked ready-for-agent issue in the active queue until a stop rule fires. Re-check dependencies and issue state after each closeout before selecting the next issue.\n\nDefault limits: process at most 10 child/work issues and at most one fix/review cycle per issue unless the user explicitly supplied a different limit. Keep a compact loop log in the final response: parent issue if any, child/work issues completed, commits, verification, issues skipped, and exact blocker/stop reason.`,
+		afk: `${base}${routing}\n\nPhase: AFK IMPLEMENTATION LOOP.\n\nTarget: ${target}\n\nUse the applicable Matt engineering skill files above. Work only on unblocked ready-for-agent issues. Start from the issue and repo docs, explore minimally, use TDD where practical, implement the smallest passing slice, and run fresh verification before claiming completion. If no unblocked ready-for-agent issue exists, stop and say so.`,
+		review: `${base}${routing}\n\nPhase: FRESH-CONTEXT REVIEW.\n\nTarget: ${target}\n\nUse the applicable Matt engineering skill files above. Review from a fresh context using the issue/PRD, current diff, AGENTS.md, CONTEXT.md, and relevant ADRs as the standard. Produce file:line findings with severity and concrete fixes. Do not silently fix unless asked.`,
+		closeout: `${base}${routing}\n\nPhase: ISSUE CLOSEOUT.\n\nTarget: ${target}\n\nUse the applicable Matt engineering skill files above. Close out only a specifically named issue or PRD target. Inspect the full issue with comments, current labels, milestone, acceptance criteria, current diff/commits, and fresh verification/review evidence. If the issue is a PRD/container, discover child issues from the generated child section or linked issue metadata and do not recommend closing the PRD until its child issues are complete or explicitly moved out of scope. If implementation and review evidence satisfy the issue, draft a concise completion comment that starts with the triage disclaimer required by the triage skill, summarize what changed and how it was verified, then ask for confirmation before posting or closing unless the user explicitly asked you to close it now. If the issue belongs to a milestone, report whether that milestone now appears complete, still has open PRDs/child work, or needs human cleanup; do not close the milestone unless the user explicitly asks and confirms. If evidence is missing, do not close; recommend the next state such as ready-for-agent, needs-info, or ready-for-human with the reason. Do not implement. Do not commit.`,
+		auto: `${base}${routing}\n\nPhase: CONTINUOUS AFK AUTO-LOOP.\n\nTarget/filter: ${target}\n\nYou are the parent orchestrator. Use the applicable Matt engineering skill files above for issue queue state, worker contracts, review standards, and closeout decisions. If the Pi subagent extension/tooling is available, use it to launch fresh-context child agents; do not make child agents run their own subagent workflows. Do not use parallel execution or worktrees unless the user explicitly asks for it in this run.\n\nLoop contract:\n1. Before starting, inspect git status. If the worktree is dirty in a way not attributable to a just-finished loop iteration, stop and report it.\n2. Resolve the target/filter into a work queue:\n   - If no explicit target/filter is supplied, query open GitHub issues labeled ready-for-agent.\n   - If the target/filter names a specific GitHub issue or issue URL, inspect that issue and its comments first. If it is a parent/PRD/container issue, do not implement or close the parent. Instead, discover its child issues and build the queue from those children.\n   - Treat an issue as a parent when it contains a PRD, a child/sub-issues section, a task list of issue references, explicit 'parent', 'epic', or 'container' wording, or comments/metadata from slicing that identify child issues. Prefer explicit child issue references in the parent body/comments; otherwise use GitHub sub-issue metadata when available; only then fall back to linked issues, shared milestone, or labels if the relationship is clear.\n   - A milestone is not a parent issue and shared milestone membership must not be used by itself to infer PRD/child hierarchy. If the target/filter names a GitHub milestone, treat it only as a queue filter over open ready-for-agent issues in that milestone; do not implement PRD/container issues, and stop if milestone membership does not make the work relationship clear.\n   - If parent detection is ambiguous, stop and report what needs human clarification instead of implementing the parent.\n3. Filter the queue to open, unblocked, ready-for-agent child/work issues. Order oldest first unless dependency/blocker text says otherwise. Respect blocker labels and issue text such as 'blocked by #123', task-list dependencies, and acceptance criteria dependencies.\n4. Stop when there are no unblocked ready-for-agent issues in the active queue, when the next issue is labeled needs-info/ready-for-human/wontfix or otherwise requires human review, when label state conflicts, or when all child issues for a parent target are complete. If parent-targeted auto mode completes every child, stop and report that the parent workflow can continue to the next phase; do not close the parent automatically.\n5. For each selected issue, route that exact issue first. Stop before launching children if routing reports invalid config, missing selected routed skills, or high-confidence overflow; otherwise launch a fresh implementation child with a concrete contract: implement exactly that child/work issue, read selected SKILL.md guidance first, keep scope minimal, use TDD where practical, verify, and return changed files plus verification evidence.\n6. Launch a separate fresh review child against the issue, routing contract, implementation diff/commit, and verification evidence. Require file:line findings and a pass/fix/blocker outcome.\n7. If review returns small concrete fixable findings, allow at most one worker fix pass and one follow-up review. Stop on non-trivial design questions, unclear acceptance criteria, failed verification, merge/conflict risk, or human judgment.\n8. After review passes, create one commit for that issue if there are uncommitted changes for it. Use a conventional commit message referencing the issue. Do not combine multiple issues in one commit.\n9. Run closeout logic for that issue: post an AI-generated completion comment using the triage disclaimer, summarize changes and verification, and close the child/work issue only when evidence supports it. If evidence does not support closeout, do not close; relabel/recommend the correct next state and stop.\n10. Continue serially with the next unblocked ready-for-agent issue in the active queue until a stop rule fires. Re-check dependencies and issue state after each closeout before selecting the next issue.\n\nDefault limits: process at most 10 child/work issues and at most one fix/review cycle per issue unless the user explicitly supplied a different limit. Keep a compact loop log in the final response: parent issue if any, child/work issues completed, commits, verification, issues skipped, and exact blocker/stop reason.`,
 	};
 
 	return prompts[phase];
@@ -220,6 +342,8 @@ function helpText(): string {
 		"  /matt-slice <prd|issue>     Create vertical-slice issue plan and record child issues on parent issues",
 		"  /matt-afk [issue|label]     Run single-issue AFK, or auto-loop when no target is supplied",
 		"  /matt-auto [filter|parent]  Continuously implement, review, commit, and close ready-for-agent issues; parent issues expand to child issues",
+		"  /matt-route-skills <issue> Read-only dry run of issue-aware skill routing",
+		"  /matt-init-skill-routes    Scaffold .pi/matt-skill-routes.json without overwriting",
 		"  /matt-review <diff|issue>   Fresh-context review",
 		"  /matt-closeout <issue>      Verify completion evidence, comment, and close/relabel an issue",
 		"  /matt-status                Show workflow status/checklist",
@@ -364,6 +488,36 @@ export default function mattWorkflowExtension(pi: ExtensionAPI) {
 		},
 	});
 
+	pi.registerCommand("matt-route-skills", {
+		description: "Read-only dry run of issue-aware skill routing for a GitHub issue",
+		getArgumentCompletions: (prefix) => {
+			const suggestions = ["#", "https://github.com/OWNER/REPO/issues/NUMBER"];
+			const filtered = suggestions.filter((item) => item.startsWith(prefix));
+			return filtered.length ? filtered.map((value) => ({ value, label: value })) : null;
+		},
+		handler: async (args, ctx) => {
+			const target = args.trim();
+			if (!target) {
+				ctx.ui.notify("Usage: /matt-route-skills <GitHub issue number|URL>. This dry run does not accept arbitrary text.", "info");
+				return;
+			}
+			const routed = routeGithubIssueTarget(target, ctx.cwd);
+			if (!routed.ok) {
+				ctx.ui.notify(routed.message, "info");
+				return;
+			}
+			ctx.ui.notify(formatDryRun(routed.result), "info");
+		},
+	});
+
+	pi.registerCommand("matt-init-skill-routes", {
+		description: "Scaffold .pi/matt-skill-routes.json without overwriting",
+		handler: async (_args, ctx) => {
+			const result = scaffoldSkillRoutes(ctx.cwd);
+			ctx.ui.notify(result.message, "info");
+		},
+	});
+
 	pi.registerCommand("matt-status", {
 		description: "Ask the agent to summarize current workflow phase/status",
 		handler: async (_args, ctx) => {
@@ -411,7 +565,7 @@ export default function mattWorkflowExtension(pi: ExtensionAPI) {
 		},
 	});
 
-	const registerPhase = (command: string, phase: Phase, description: string, fresh = false) => {
+	const registerPhase = (command: string, phase: Phase, description: string, fresh = false, routeAware = false) => {
 		pi.registerCommand(command, {
 			description,
 			getArgumentCompletions: (prefix) => {
@@ -420,7 +574,13 @@ export default function mattWorkflowExtension(pi: ExtensionAPI) {
 				return filtered.length ? filtered.map((value) => ({ value, label: value })) : null;
 			},
 			handler: async (args, ctx) => {
-				const prompt = phasePrompt(phase, args, ctx.cwd);
+				const routingContext = routeAware ? routeConfigContext(ctx.cwd) : undefined;
+				if (routingContext && !routingContext.validation.ok) {
+					ctx.ui.notify(formatValidationDiagnostics(routingContext.validation), "info");
+					return;
+				}
+				const routingAddition = routeAware ? routingAwarePromptAddition(phase, args, ctx.cwd) : undefined;
+				const prompt = phasePrompt(phase, args, ctx.cwd, routingAddition);
 				pi.appendEntry(`${EXTENSION_NAME}:phase`, { phase, args: args.trim(), at: Date.now() });
 
 				if (fresh) {
@@ -441,7 +601,7 @@ export default function mattWorkflowExtension(pi: ExtensionAPI) {
 	registerPhase("matt-grill", "grill", "Run human-in-loop grilling for a feature/issue");
 	registerPhase("matt-prd", "prd", "Create a PRD / destination document from resolved context");
 	registerPhase("matt-refactors", "refactors", "Review out-of-scope grill refactors before slicing");
-	registerPhase("matt-slice", "slice", "Break a PRD into vertical-slice issues");
+	registerPhase("matt-slice", "slice", "Break a PRD into vertical-slice issues", false, true);
 
 	pi.registerCommand("matt-afk", {
 		description: "Start a single-issue AFK loop, or auto-loop when no target is supplied",
@@ -453,7 +613,21 @@ export default function mattWorkflowExtension(pi: ExtensionAPI) {
 		handler: async (args, ctx) => {
 			const trimmedArgs = args.trim();
 			const phase: Phase = trimmedArgs ? "afk" : "auto";
-			const prompt = phasePrompt(phase, trimmedArgs, ctx.cwd);
+			const routingContext = routeConfigContext(ctx.cwd);
+			if (!routingContext.validation.ok) {
+				ctx.ui.notify(formatValidationDiagnostics(routingContext.validation), "info");
+				return;
+			}
+			const routed = trimmedArgs && isGithubIssueTarget(trimmedArgs) ? routeGithubIssueTarget(trimmedArgs, ctx.cwd) : undefined;
+			if (routed && !routed.ok) {
+				ctx.ui.notify(routed.message, "info");
+				return;
+			}
+			if (routed?.ok && !routed.result.validation.ok) {
+				ctx.ui.notify(formatDryRun(routed.result), "info");
+				return;
+			}
+			const prompt = phasePrompt(phase, trimmedArgs, ctx.cwd, routed?.ok ? formatRoutingPromptContract(routed.result) : routingAwarePromptAddition(phase, trimmedArgs, ctx.cwd));
 			pi.appendEntry(`${EXTENSION_NAME}:phase`, { phase, args: trimmedArgs, at: Date.now() });
 
 			if (!trimmedArgs) {
@@ -469,7 +643,7 @@ export default function mattWorkflowExtension(pi: ExtensionAPI) {
 		},
 	});
 
-	registerPhase("matt-auto", "auto", "Continuously implement, review, commit, and close ready-for-agent issues");
+	registerPhase("matt-auto", "auto", "Continuously implement, review, commit, and close ready-for-agent issues", false, true);
 	registerPhase("matt-review", "review", "Start a fresh-context review", true);
 	registerPhase("matt-closeout", "closeout", "Verify completion evidence and close/relabel an issue");
 

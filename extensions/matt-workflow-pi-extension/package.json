@@ -16,6 +16,7 @@
   "homepage": "https://github.com/GregM1991/gm-pi-environment/tree/main/extensions/matt-workflow-pi-extension#readme",
   "files": [
     "index.ts",
+    "skill-routing/**/*",
     "skills/**/*",
     "augmentations/**/*",
     "vendor/**/*",
@@ -24,7 +25,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "check": "bun --check index.ts scripts/sync-matt-skills.ts",
+    "check": "bun --check index.ts scripts/sync-matt-skills.ts skill-routing/*.ts",
+    "test": "bun test skill-routing/*.test.ts",
     "sync:matt-skills": "bun scripts/sync-matt-skills.ts",
     "sync:matt-skills:dry-run": "bun scripts/sync-matt-skills.ts --dry-run"
   },

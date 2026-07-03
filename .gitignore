@@ -19,3 +19,5 @@ config/pi/mcp-onboarding.json
 .DS_Store
 .vscode/
 .idea/
+
+.pi-subagents

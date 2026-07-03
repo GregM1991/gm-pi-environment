@@ -20,7 +20,7 @@ Do not treat this file as the full workflow specification. The extension loads a
 - Treat GitHub milestones as optional human-facing delivery arcs above PRDs: they can group multiple PRD issues and their descendant slice issues, but they do not replace the PRD -> child issue hierarchy and are not readiness state.
 - Do not create, assign, or close milestones unless the user explicitly asks or confirms. `/matt-milestone` is status/review-oriented by default, not implementation-oriented.
 - If a phase prompt lists Matt engineering skills that do not fit the task, skip them and briefly say why.
-- Do not load, read, invoke, or reference non-engineering Matt skills or non-Matt skills while running this workflow.
+- Do not load, read, invoke, or reference non-engineering Matt skills or non-Matt skills while running this workflow unless an issue-aware skill routing contract explicitly selects a registered skill and provides its absolute `SKILL.md` path.
 
 ## Architecture learning lens
 
@@ -52,6 +52,19 @@ The document has two jobs:
 After PRD completion, run the formal refactor-review phase before slicing. In that phase, quickly walk the user through out-of-scope refactor candidates, decide which should become GitHub issues, create requested issues using the repo tracker conventions, then ask for explicit confirmation before deleting `MATT-GRILL-NOTES.md`. Do not move into slicing until the user has been prompted about deletion.
 
 The extension owns the phase-to-engineering-skill mapping.
+
+## Issue-aware skill routing
+
+Routing-aware commands (`/matt-route-skills`, `/matt-init-skill-routes`, `/matt-slice`, `/matt-afk`, and `/matt-auto`) use `.pi/matt-skill-routes.json` plus typed extension defaults. Invalid routing config, missing selected skills, and high-confidence overflow are hard stops for implementation automation.
+
+When a prompt includes a routing contract:
+
+- Treat selected skill IDs and absolute `SKILL.md` paths as mandatory upfront guidance for the child agent.
+- Keep baseline worker skills (`implement`, `tdd`) even if a repo disables routed skills.
+- Let workers report only a compact `Skill adjustments` line (`none` if unchanged) after repo exploration; do not turn routing into an audit checklist.
+- Do not name skills in commits or issue closeout comments.
+
+When slicing, include visible `## Agent skill hints` and the machine-readable `matt-agent-skill-hints` JSON comment in child issue bodies. These hints are low-authority diagnostics; auto mode recomputes routing from the final child issue before implementation.
 
 ## Milestone delivery arcs
 

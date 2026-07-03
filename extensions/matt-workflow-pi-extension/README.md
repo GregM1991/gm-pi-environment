@@ -14,6 +14,8 @@ The extension is intentionally thin: it loads the `matt-workflow` orchestrator s
 - `/matt-afk <issue|label>` — fresh-context single-issue AFK implementation loop
 - `/matt-afk` — no-argument shorthand for the continuous auto-loop
 - `/matt-auto [filter|parent]` — continuously implement, review, commit, and close ready-for-agent issues until blocked; when passed a parent/PRD issue, expands it into child issues and stops after the child queue is complete
+- `/matt-route-skills <GitHub issue>` — read-only dry run that validates skill-routing config, fetches the issue with `gh`, and explains worker/review packs
+- `/matt-init-skill-routes` — scaffold `.pi/matt-skill-routes.json` only, refusing to overwrite an existing config
 - `/matt-review <diff|issue>` — fresh-context review
 - `/matt-closeout <issue>` — verify completion evidence, draft/post completion comment, and close or relabel an issue
 - `/matt-next <target>` — interactive phase picker
@@ -123,6 +125,34 @@ Use `/matt-arch-gym [target]` for interactive reps. The agent picks a small repo
 
 Normal phase prompts also carry a lightweight reminder to use this lens only when architecture-sensitive, and to keep checkpoints short unless the user asks to go deeper.
 
+## Issue-aware skill routing
+
+Routing-aware commands use typed extension defaults plus optional strict repo JSON at `.pi/matt-skill-routes.json` (`version: 1`). Defaults keep the worker baseline small (`implement`, `tdd`) and add ticket-specific routed skills only when issue labels/title/body/path hints provide evidence.
+
+Config shape:
+
+```json
+{
+  "version": 1,
+  "limits": {
+    "workerMaxRoutedSkills": 3,
+    "reviewMaxRoutedSkills": 4
+  },
+  "skills": [],
+  "routes": [],
+  "disabledRoutes": [],
+  "disabledSkills": []
+}
+```
+
+Repo-defined skills must point to repo-relative local `SKILL.md` files inside the repo, for example `.pi/skills/domain/SKILL.md`. Route matching is positive-only and uses labels plus plain case-insensitive title/body/path substrings; no regex, negative `unless`, per-token confidence, or inferred tech-stack requirements are supported.
+
+Use `/matt-route-skills #123` to validate config and explain selected worker/review packs before automation. `/matt-init-skill-routes` creates the scaffold only and refuses to overwrite. For GitHub issue targets, explicit file-like strings in the issue title/body are included as path evidence for route matching.
+
+Routing-aware commands hard-stop on invalid config, missing selected routed skills, or high-confidence overflow. Medium-confidence overflow is trimmed to the active cap after dedupe. Repo `disabledSkills` affects routed skills only; it does not remove the baseline worker skills.
+
+`/matt-slice` includes visible `## Agent skill hints` and machine-readable `matt-agent-skill-hints` JSON metadata in child issues when it creates them. These hints are low-authority diagnostics. `/matt-auto` and `/matt-afk <label>` still resolve the concrete queue issue inside their prompt-driven loops, so the extension cannot pre-route unresolved label/filter queues before launch; their prompts require routing the selected issue before implementation and stopping on invalid route results. Worker/review contracts include selected skill IDs, absolute `SKILL.md` paths, evidence-backed rationale, mandatory upfront reading guidance, and only a compact `Skill adjustments` note when the worker changes the proposed pack. Commit messages and closeout comments should describe the work and verification, not the skills used.
+
 ## Skill policy
 
 - Loads only the local `matt-workflow` orchestrator skill by default.
@@ -159,6 +189,7 @@ After syncing, inspect `/matt-skills` and `index.ts` for renamed or newly useful
 
 ```bash
 bun run check
+bun test
 pi --no-skills --no-extensions \
   -e "$PWD/index.ts" \
   --skill "$PWD/skills/matt-workflow" \
