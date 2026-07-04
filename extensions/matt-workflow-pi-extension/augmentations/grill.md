@@ -1,16 +1,10 @@
 # Matt workflow augmentation: grill
 
-Local policy layered on top of upstream Matt engineering skills for `/matt-grill`.
+Templates for the `MATT-GRILL-NOTES.md` scratch document, layered on top of upstream Matt engineering skills for `/matt-grill`. Lifecycle rules (lazy creation, append-only Q&A, refactor extraction, deletion confirmation) live in the phase prompts; this file owns the document formats.
 
-## Grill session scratch document
+## Append-only Q&A record
 
-For codebase work, maintain a repo-local, top-level scratch document named `MATT-GRILL-NOTES.md`. Create it lazily after the first answered grill question or the first out-of-scope refactor finding. Do not create it just because the phase started.
-
-The scratch document is temporary workflow state. It should be deleted, after explicit user confirmation, before the workflow moves from post-PRD refactor review into PRD slicing.
-
-### Append-only Q&A record
-
-Record each answered grill question in an append-only Q&A section. Never rewrite or reorder prior Q&A entries. Use numbered entries:
+Record each answered grill question in an append-only Q&A section. Never rewrite or reorder prior entries. Use numbered entries:
 
 ```md
 ## Q&A
@@ -25,7 +19,7 @@ Record each answered grill question in an append-only Q&A section. Never rewrite
 
 If a later answer changes direction, append a new entry that supersedes the earlier entry; do not edit the earlier one.
 
-### Potential refactors discovered during grilling
+## Potential refactors discovered during grilling
 
 Track only refactor candidates that are outside the PRD scope being grilled. If a discovery belongs in the PRD target, capture it in the grill Q&A/PRD context instead and leave it out of the refactor candidates section.
 
