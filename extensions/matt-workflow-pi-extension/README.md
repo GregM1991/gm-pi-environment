@@ -157,7 +157,9 @@ Config shape:
 
 All sections are optional except `version`. If the file is absent, existing detection runs. If the file is present and valid, configured sections win and omitted sections fall back to detection independently. If the file exists but is invalid, every command that would send a base-context phase prompt hard-stops with diagnostics instead of silently falling back.
 
-Doc paths must be repo-relative local paths, must stay inside the repo, and must exist on disk. `tracker.type` supports only `github-issues` in v1. Toolchain commands are hint-only; agents see them as preferred verification commands, but the extension does not execute them automatically. Supported command keys are `test`, `check`, `build`, and `aiGate`.
+Doc paths must be repo-relative local paths, must stay inside the repo, and must exist on disk. `tracker.type` supports only `github-issues` in v1. Most toolchain commands are hint-only; agents see them as preferred verification commands, but the extension does not execute them automatically. Supported command keys are `test`, `check`, `build`, and `aiGate`.
+
+`toolchain.commands.aiGate` is optional and review-phase specific. When present, `/matt-review` prompts require the agent to run that command and fold must-fix/should-fix findings into the verdict, or report the gate failure explicitly. Example: `"aiGate": "bun run ai-gate --base main --head HEAD"`.
 
 Use `/matt-init-conventions` to create the scaffold without overwriting an existing file.
 

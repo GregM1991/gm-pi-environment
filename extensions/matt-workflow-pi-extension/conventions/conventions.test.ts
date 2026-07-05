@@ -74,6 +74,20 @@ describe("repo conventions config", () => {
 		expect(docsHint(context, repoRoot)).toBe("No expanded repo-local workflow doc was detected; rely on the phase engineering-skill references below.");
 	});
 
+	test("accepts aiGate as an optional configured command", () => {
+		writeConfig({ version: 1, toolchain: { runtime: "bun", commands: { test: "bun test", aiGate: "bun run ai-gate --base main --head HEAD" } } });
+		const context = buildConventionsContext(repoRoot);
+		expect(context.validation.ok).toBe(true);
+		expect(context.config?.toolchain?.commands?.aiGate).toBe("bun run ai-gate --base main --head HEAD");
+		expect(toolchainHint(context, repoRoot)).toContain("aiGate: `bun run ai-gate --base main --head HEAD`");
+	});
+
+	test("rejects blank aiGate commands", () => {
+		writeConfig({ version: 1, toolchain: { runtime: "bun", commands: { aiGate: "   " } } });
+		const diagnostics = buildConventionsContext(repoRoot).validation.diagnostics;
+		expect(diagnostics).toContainEqual(expect.objectContaining({ code: "invalid-command", path: "toolchain.commands.aiGate" }));
+	});
+
 	test("hint text uses configured docs, extras, runtime, and commands", () => {
 		write("docs/workflow.md");
 		write("docs/context.md");
