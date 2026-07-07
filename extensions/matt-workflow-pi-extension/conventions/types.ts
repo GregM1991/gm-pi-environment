@@ -12,6 +12,7 @@ export type RepoConventionsConfigV1 = {
 			test?: string;
 			check?: string;
 			build?: string;
+			aiGate?: string;
 		};
 	};
 	docs?: {

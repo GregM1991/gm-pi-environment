@@ -6,7 +6,7 @@ import type { ConventionsContext, RepoConventionsConfigV1 } from "./types";
 const TOP_LEVEL_KEYS = new Set(["version", "tracker", "toolchain", "docs"]);
 const TRACKER_KEYS = new Set(["type", "labelsDocPath"]);
 const TOOLCHAIN_KEYS = new Set(["runtime", "commands"]);
-const COMMAND_KEYS = new Set(["test", "check", "build"]);
+const COMMAND_KEYS = new Set(["test", "check", "build", "aiGate"]);
 const DOCS_KEYS = new Set(["workflowDocPath", "extraContextDocs"]);
 
 const diagnostic = (code: string, message: string, pathName?: string): ValidationDiagnostic => ({

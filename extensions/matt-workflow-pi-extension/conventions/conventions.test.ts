@@ -77,10 +77,11 @@ describe("repo conventions config", () => {
 	test("hint text uses configured docs, extras, runtime, and commands", () => {
 		write("docs/workflow.md");
 		write("docs/context.md");
-		writeConfig({ version: 1, toolchain: { runtime: "pnpm", commands: { test: "pnpm test", check: "pnpm typecheck", build: "pnpm build" } }, docs: { workflowDocPath: "docs/workflow.md", extraContextDocs: ["docs/context.md"] } });
+		writeConfig({ version: 1, toolchain: { runtime: "pnpm", commands: { test: "pnpm test", check: "pnpm typecheck", build: "pnpm build", aiGate: "pnpm ai-gate" } }, docs: { workflowDocPath: "docs/workflow.md", extraContextDocs: ["docs/context.md"] } });
 		const context = buildConventionsContext(repoRoot);
+		expect(context.validation.ok).toBe(true);
 		expect(toolchainHint(context, repoRoot)).toContain("This repo is pnpm-first");
-		expect(toolchainHint(context, repoRoot)).toContain("test: `pnpm test`, check: `pnpm typecheck`, build: `pnpm build`");
+		expect(toolchainHint(context, repoRoot)).toContain("test: `pnpm test`, check: `pnpm typecheck`, build: `pnpm build`, aiGate: `pnpm ai-gate`");
 		expect(docsHint(context, repoRoot)).toContain("`docs/workflow.md`");
 		expect(docsHint(context, repoRoot)).toContain("Additional context docs: `docs/context.md`");
 	});

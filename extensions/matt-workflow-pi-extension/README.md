@@ -144,7 +144,8 @@ Config shape:
     "commands": {
       "test": "bun test",
       "check": "bun run check",
-      "build": "bun run build"
+      "build": "bun run build",
+      "aiGate": "bun run ai-gate --base main --head HEAD"
     }
   },
   "docs": {
@@ -156,7 +157,7 @@ Config shape:
 
 All sections are optional except `version`. If the file is absent, existing detection runs. If the file is present and valid, configured sections win and omitted sections fall back to detection independently. If the file exists but is invalid, every command that would send a base-context phase prompt hard-stops with diagnostics instead of silently falling back.
 
-Doc paths must be repo-relative local paths, must stay inside the repo, and must exist on disk. `tracker.type` supports only `github-issues` in v1. Toolchain commands are hint-only; agents see them as preferred verification commands, but the extension does not execute them automatically.
+Doc paths must be repo-relative local paths, must stay inside the repo, and must exist on disk. `tracker.type` supports only `github-issues` in v1. Toolchain commands are hint-only; agents see them as preferred verification commands, but the extension does not execute them automatically. Supported command keys are `test`, `check`, `build`, and `aiGate`.
 
 Use `/matt-init-conventions` to create the scaffold without overwriting an existing file.
 
