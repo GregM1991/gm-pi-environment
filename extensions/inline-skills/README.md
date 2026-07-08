@@ -6,30 +6,27 @@ Pi normally expands `/skill:name` only when it appears at the beginning of the e
 
 ## Syntax
 
-Use any of these forms anywhere in your message:
+Use this form anywhere in your message:
 
 ```text
-@skill:diagnose
-@skills:diagnose
-/skill:diagnose
-/skills:diagnose
+#diagnose
 ```
+
+Native leading `/skill:name` and `/skills:name` prompts are still handled by Pi itself when they appear at the start of the editor.
 
 Multiple inline skills are supported in the same message:
 
 ```text
-Can you fix this using @skill:diagnose and @skill:testing-philosophy?
+Can you fix this using #diagnose and #testing-philosophy?
 ```
 
 ## Autocomplete
 
-The extension adds autocomplete for inline skill references. Type one of these anywhere in the editor and use Tab / the normal Pi autocomplete flow:
+The extension adds autocomplete for inline skill references. Type `#` anywhere in the editor to show all skills, or continue typing to filter them:
 
 ```text
-@skill:diag
-@skills:diag
-/skill:diag
-/skills:diag
+#
+#diag
 ```
 
 ## Install

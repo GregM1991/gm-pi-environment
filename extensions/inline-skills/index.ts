@@ -4,8 +4,8 @@ import { join } from "node:path";
 
 type SkillCommand = ReturnType<ExtensionAPI["getCommands"]>[number];
 
-const INLINE_SKILL_PATTERN = /(?:^|\s)(@skills?:|\/skills?:)([a-z0-9][a-z0-9-]{0,63})(?=$|\s|[.,;:!?])/gi;
-const INLINE_SKILL_COMPLETION_PATTERN = /(?:^|[ \t])(@skills?:|\/skills?:)([a-z0-9-]*)$/i;
+const INLINE_SKILL_PATTERN = /(?:^|\s)#([a-z][a-z0-9-]{0,63})(?=$|\s|[.,;:!?])/gi;
+const INLINE_SKILL_COMPLETION_PATTERN = /(?:^|[ \t])#([a-z0-9-]*)$/i;
 
 function normalizeSkillName(name: string): string {
 	return name.trim().toLowerCase();
@@ -54,7 +54,7 @@ function readSkill(command: SkillCommand): { path: string; baseDir: string; cont
 function extractInlineSkillNames(text: string): string[] {
 	const names = new Set<string>();
 	for (const match of text.matchAll(INLINE_SKILL_PATTERN)) {
-		const name = match[2];
+		const name = match[1];
 		if (name) names.add(normalizeSkillName(name));
 	}
 	return [...names];
@@ -90,19 +90,18 @@ export default function inlineSkillsExtension(pi: ExtensionAPI) {
 					return current.getSuggestions(lines, cursorLine, cursorCol, options);
 				}
 
-				const trigger = match[1] ?? "@skill:";
-				const typedName = normalizeSkillName(match[2] ?? "");
+				const typedName = normalizeSkillName(match[1] ?? "");
 				const skillCommands = getSkillCommands(pi);
 				const items = [...skillCommands.entries()]
 					.filter(([name]) => name.startsWith(typedName))
 					.map(([name, command]) => ({
-						value: `${trigger}${name}`,
-						label: `${trigger}${name}`,
+						value: `#${name}`,
+						label: `#${name}`,
 						description: command.description,
 					}));
 
 				return {
-					prefix: `${trigger}${match[2] ?? ""}`,
+					prefix: `#${match[1] ?? ""}`,
 					items,
 				};
 			},
