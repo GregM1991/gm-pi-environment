@@ -103,6 +103,7 @@ Every dependency affects bundle size, upgrades, security, types, and future Reac
 - If it renders UI, make it a component.
 - If it coordinates React state/effects/context for a component, make it a hook.
 - If a hook only calls a pure helper and returns the result, delete the hook and export the helper.
+- If a hook implements a subscribe/getSnapshot store out of refs and callbacks, extract a pure factory (a plain closure owning the value, listener set, and any rAF/timer loop) and keep the hook as a thin `useSyncExternalStore` binding. The tell: every React API in the hook is inert — `useRef` used only as instance storage, `useCallback` only for stable identity, no `useState`/`useEffect`. If deleting the React imports would only mean renaming `ref.current` to a local variable, it is a closure wearing a hook costume.
 </rule>
 
 <rule name="local_or_global_state">
@@ -150,6 +151,7 @@ Before handing off React code, confirm:
 - Do not introduce global state because prop drilling feels mildly inconvenient.
 - Do not create generic components before the second real use case proves the shared shape.
 - Do not hide unclear logic inside a hook and call that architecture.
+- Do not build an external store inside a hook from inert `useRef`/`useCallback` scaffolding; a store other code subscribes to should be a plain module the hook merely binds.
 - Do not use `useEffect` to derive state that can be computed during render.
 - Do not silence hook dependency warnings without a written reason and safer alternative considered.
 - Do not pass vendor SDK objects or API response blobs deep into UI components.

@@ -23,6 +23,8 @@ Every component/module has exactly two users:
 
 **NEVER create a third "test user"** that observes implementation details.
 
+This includes production API surface whose only consumer is the test suite: a prop, parameter, or fallback branch kept "for tests" is third-user code. Delete it and drive the test through the real mechanism (a fake of the real dependency), not a parallel one.
+
 ### User-Observable Behavior (SHOULD break tests)
 
 - What the end user sees (rendered content, error messages)
@@ -81,5 +83,6 @@ Every component/module has exactly two users:
 - Components you control
 - Internal modules/services
 - Hooks within the same codebase
+- The collaborator whose interaction is the point of the test — a test that mocks away the behavior it exists to verify (e.g. mocking the child component whose re-render isolation you are asserting) passes while covering nothing
 
 See [examples.md](examples.md) for good vs bad test patterns.

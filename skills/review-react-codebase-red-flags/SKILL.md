@@ -98,6 +98,7 @@ For each finding, report: file path, observed evidence, red flag category, why i
 - Poor TypeScript hygiene: `any`, unchecked casts, ignored compiler errors, vague object shapes.
 - Disabling `react-hooks/exhaustive-deps` instead of fixing effect design.
 - Using a hook when a plain function would do.
+- External stores (subscribe/getSnapshot for `useSyncExternalStore`) implemented inside a hook via `useRef` + `useCallback` instead of as a pure factory closure with a thin hook binding. This passes a skim because `useSyncExternalStore` appears correctly at the leaf — check the store's implementation, not just its interface. The tell: every React API in the hook is inert (refs as pure instance storage, `useCallback` only for identity, no `useState`/`useEffect`). Symptoms: the store is plumbed through hook returns and props instead of standing alone, `useCallback` dependency chains exist only to simulate closure stability, and tests need `renderHook` for what could be plain unit tests.
 - Rolling a bespoke data-fetching layer without a clear need.
 - No error boundaries, empty catch blocks, and missing loading/error states.
 - Default object/array/function values that accidentally break memoization.
