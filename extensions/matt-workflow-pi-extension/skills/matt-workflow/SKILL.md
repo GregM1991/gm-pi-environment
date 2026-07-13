@@ -15,6 +15,7 @@ Do not treat this file as the full workflow specification. The extension loads a
 - Do not jump from planning to implementation unless the user invoked the implementation phase.
 - Do not close or relabel issues unless the user invoked `/matt-closeout`, invoked `/matt-auto`, invoked no-argument `/matt-afk`, or explicitly asked for issue closeout.
 - In auto-loop mode, keep the parent session as orchestrator; implementation and review should run in separate fresh child contexts when subagent tooling is available.
+- Auto-loop review remediation allows up to three fix/review cycles after the initial review. A concrete `FIX` or `BLOCKER` finding should continue to a fix worker and fresh reviewer while budget remains; `BLOCKER` alone is not a reason to stop unless resolving it requires human judgment or another explicit safety stop.
 - Use durable repo context: `AGENTS.md`, `CONTEXT.md`, relevant ADRs, relevant directory `AGENTS.md`, and named GitHub issues.
 - Use GitHub Issues when tracker work is needed, with the labels documented in `docs/agents/triage-labels.md` when that file exists; otherwise follow the repo's own tracker/label conventions or recommend `setup-matt-pocock-skills`.
 - Treat GitHub milestones as optional human-facing delivery arcs above PRDs: they can group multiple PRD issues and their descendant slice issues, but they do not replace the PRD -> child issue hierarchy and are not readiness state.
