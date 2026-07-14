@@ -56,6 +56,9 @@ describe("Wayfinder automation boundaries", () => {
 		expect(auto).toContain("at most three fix/review cycles per issue");
 		expect(auto).toContain("must continue while fewer than three fix/review cycles have been used");
 		expect(auto).toContain("parent orchestrator exclusively owns review launches");
+		expect(auto).toContain("builtin `worker` agent for implementation and fix children");
+		expect(auto).toContain("builtin `reviewer` agent for review children");
+		expect(auto).toContain('context: "fresh"');
 		expect(auto).toContain("not to review, commit, close issues, or launch subagents");
 	}));
 });

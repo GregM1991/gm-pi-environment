@@ -23,6 +23,18 @@
     "npm:@hypabolic/pi-hypa",
     "npm:pi-intercom"
   ],
+  "subagents": {
+    "agentOverrides": {
+      "worker": {
+        "model": "openai-codex/gpt-5.6-sol",
+        "thinking": "low"
+      },
+      "reviewer": {
+        "model": "openai-codex/gpt-5.6-sol",
+        "thinking": "high"
+      }
+    }
+  },
   "doubleEscapeAction": "tree",
   "treeFilterMode": "no-tools",
   "warnings": {

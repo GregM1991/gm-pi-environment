@@ -66,6 +66,15 @@ Override their directory with `PI_ENV_LOCAL_CONFIG_DIR`. Objects are merged recu
 
 Keep credentials and machine-specific MCP servers in `mcp.local.json`; do not commit them. The bootstrap validates both base and overlay JSON before changing live files, backs up existing files, and preserves Pi's generated `lastChangelogVersion` setting.
 
+## Global subagent role policy
+
+`config/pi/settings.base.json` pins the builtin Pi subagent roles used across projects and workflows:
+
+- `worker` — `openai-codex/gpt-5.6-sol` with `low` thinking.
+- `reviewer` — `openai-codex/gpt-5.6-sol` with `high` thinking.
+
+These user-scope `subagents.agentOverrides` apply to every Pi project after bootstrap unless a project `.pi/settings.json` or an explicit per-run override takes precedence. The Matt auto-loop also names these builtin roles and requires `context: "fresh"` for both.
+
 ## Local-only resources
 
 Mindspace prompts and other machine-specific prompts may remain in `~/.pi/agent/prompts`. Shared prompts belong in this repository.
