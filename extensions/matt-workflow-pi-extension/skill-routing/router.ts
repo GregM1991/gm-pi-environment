@@ -135,7 +135,7 @@ function buildPack(role: AgentRole, context: RoutingContext, candidates: SkillSe
 	let routed = sorted;
 	if (overflowHighConfidence) {
 		for (const selection of sorted.filter((item) => item.confidence === "high")) {
-			skipped.push({ skillId: selection.skillId, routeId: selection.routeIds[0], reason: `${role} high-confidence routed skills exceed cap ${limit}; automation must stop for re-slicing`, evidence: selection.evidence, confidence: selection.confidence });
+			skipped.push({ skillId: selection.skillId, routeId: selection.routeIds[0], reason: `${role} high-confidence routed skills exceed cap ${limit}; automation must stop until the ticket is split`, evidence: selection.evidence, confidence: selection.confidence });
 		}
 	} else {
 		routed = sorted.slice(0, limit);

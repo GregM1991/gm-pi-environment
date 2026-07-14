@@ -8,12 +8,13 @@ The extension is intentionally thin: it loads the `matt-workflow` orchestrator s
 
 - `/matt-start <issue|brief>` — intake and next-phase recommendation
 - `/matt-grill <issue|brief>` — human-in-loop alignment questions
-- `/matt-prd <issue|brief>` — PRD / destination document
-- `/matt-refactors <prd|issue>` — post-PRD review of out-of-scope grill refactors before slicing
-- `/matt-slice <prd|issue>` — vertical-slice issue decomposition; when slicing a parent/PRD issue, records created child issues back on the parent
+- `/matt-wayfinder <destination|map|ticket>` — map and resolve planning decisions for large, foggy, multi-session work; never implements the destination
+- `/matt-spec <issue|brief>` — spec / destination document
+- `/matt-refactors <spec|issue>` — post-spec review of out-of-scope grill refactors before ticket decomposition
+- `/matt-tickets <spec|issue>` — tracer-bullet ticket decomposition; when decomposing a parent/spec issue, records created child issues back on the parent
 - `/matt-afk <issue|label>` — fresh-context single-issue AFK implementation loop
 - `/matt-afk` — no-argument shorthand for the continuous auto-loop
-- `/matt-auto [filter|parent]` — continuously implement, review, commit, and close ready-for-agent issues until blocked; when passed a parent/PRD issue, expands it into child issues and stops after the child queue is complete
+- `/matt-auto [filter|parent]` — continuously implement, review, commit, and close ready-for-agent issues until blocked; when passed a parent/spec issue, expands it into child issues and stops after the child queue is complete
 - `/matt-route-skills <GitHub issue>` — read-only dry run that validates skill-routing config, fetches the issue with `gh`, and explains worker/review packs
 - `/matt-init-skill-routes` — scaffold `.pi/matt-skill-routes.json` only, refusing to overwrite an existing config
 - `/matt-init-conventions` — scaffold `.pi/matt-conventions.json` only, refusing to overwrite an existing config
@@ -27,30 +28,36 @@ The extension is intentionally thin: it loads the `matt-workflow` orchestrator s
 - `/matt-skills [phase]` — show phase-specific Matt engineering skill references
 - `/matt-profile` or `/matt-help` — command summary and minimal boot command
 
+## Wayfinder pre-spec path
+
+Use `/matt-wayfinder` only when a destination is large, foggy, or expected to span multiple sessions. Chart mode creates a `wayfinder:map` and decision tickets (`wayfinder:research`, `wayfinder:prototype`, `wayfinder:grilling`, or `wayfinder:task`) with explicit frontier/blocking edges. Work mode resolves exactly one decision ticket per session. A research ticket may use parallel research subagents, but the session still resolves only that ticket; HITL grilling/prototype tickets require the live user.
+
+Wayfinder is planning, not implementation. `/matt-afk` and `/matt-auto` exclude every Wayfinder map and decision ticket even when a ticket is marked AFK or `ready-for-agent`. Once the map is clear, continue with `/matt-spec`, then `/matt-tickets`; normal implementation routing starts only from tickets that satisfy the existing readiness contract.
+
 ## Parent and child issue workflow
 
-When `/matt-slice` creates child issues from an existing parent/PRD issue, it updates the parent with a predictable `## Child issues` section. That section lists each child issue number/link, one-line purpose, readiness label recommendation, and dependency/blocker notes.
+When `/matt-tickets` creates child issues from an existing parent/spec issue, it updates the parent with a predictable `## Child issues` section. That section lists each child issue number/link, one-line purpose, readiness label recommendation, and dependency/blocker notes.
 
-When `/matt-auto` receives a specific GitHub issue or issue URL, it inspects that issue before building the queue. If the issue appears to be a parent, PRD, epic, or container issue, auto mode does **not** implement or close the parent directly. It discovers child issues from explicit child/sub-issue sections, task-list issue references, slicing comments/metadata, GitHub sub-issue metadata when available, or clear linked issue relationships.
+When `/matt-auto` receives a specific GitHub issue or issue URL, it inspects that issue before building the queue. If the issue appears to be a parent, spec, epic, or container issue, auto mode does **not** implement or close the parent directly. It discovers child issues from explicit child/sub-issue sections, task-list issue references, ticket decomposition comments/metadata, GitHub sub-issue metadata when available, or clear linked issue relationships.
 
 Auto mode then processes open, unblocked, `ready-for-agent` child issues serially, respecting dependency text such as `blocked by #123`. After the initial implementation review, it may run up to three fix/review cycles for concrete findings; each cycle uses a fix worker followed by a separate fresh reviewer. A concrete `FIX` or `BLOCKER` verdict continues while that budget remains—`BLOCKER` alone does not stop automation unless resolution requires human judgment or another safety stop. After each child closeout it re-checks queue state. It stops when every child issue is complete, when remaining children are blocked or need human input, when the three-cycle remediation budget is exhausted without a passing review, or when the queue state is ambiguous. Parent issues are left open so the user can continue the Matt workflow pipeline manually.
 
 ## Milestone delivery arcs
 
-GitHub milestones are optional human-facing delivery arcs above the normal Matt workflow hierarchy. They group related PRDs and their descendant implementation slices so a developer can see when a feature direction is ready to tie up in a bow.
+GitHub milestones are optional human-facing delivery arcs above the normal Matt workflow hierarchy. They group related specs and their descendant implementation tickets so a developer can see when a feature direction is ready to tie up in a bow.
 
 The hierarchy remains:
 
 ```text
 Milestone = strategic delivery arc
-PRD issue = coherent destination / feature proposal
-Child issue = independently agentable vertical slice
+spec issue = coherent destination / feature proposal
+Child issue = independently agentable tracer-bullet ticket
 Labels = execution/readiness state
 ```
 
-Milestones do **not** replace parent/child issue relationships and are not readiness state. `/matt-prd` may associate a confirmed milestone with a PRD. `/matt-slice` may inherit a PRD milestone onto created child issues for GitHub progress tracking. `/matt-auto` treats a milestone only as an optional queue filter; shared milestone membership alone is not enough to infer a PRD/child hierarchy.
+Milestones do **not** replace parent/child issue relationships and are not readiness state. `/matt-spec` may associate a confirmed milestone with a spec. `/matt-tickets` may inherit a spec milestone onto created child issues for GitHub progress tracking. `/matt-auto` treats a milestone only as an optional queue filter; shared milestone membership alone is not enough to infer a spec/child hierarchy.
 
-Use `/matt-milestone [name|#]` to inspect an open delivery arc: PRDs, discovered child issues, ready-for-agent work, blockers, orphan milestone issues, and the next human decision needed. It is read-only by default and should not create, close, or mutate milestones unless explicitly asked in a follow-up.
+Use `/matt-milestone [name|#]` to inspect an open delivery arc: specs, discovered child issues, ready-for-agent work, blockers, orphan milestone issues, and the next human decision needed. It is read-only by default and should not create, close, or mutate milestones unless explicitly asked in a follow-up.
 
 See [`docs/agents/milestones.md`](./docs/agents/milestones.md) for the detailed convention.
 
@@ -96,9 +103,9 @@ alias pi-matt-full='pi --no-skills --no-extensions \
 
 ## Grill notes and refactor extraction
 
-During `/matt-grill`, codebase work may create a temporary top-level repo file named `MATT-GRILL-NOTES.md` after the first answered grill question or out-of-scope refactor finding. The Q&A section is append-only. The potential refactors section is editable/groupable and should include only candidates outside the PRD scope.
+During `/matt-grill`, codebase work may create a temporary top-level repo file named `MATT-GRILL-NOTES.md` after the first answered grill question or out-of-scope refactor finding. The Q&A section is append-only. The potential refactors section is editable/groupable and should include only candidates outside the spec scope.
 
-After `/matt-prd`, run `/matt-refactors` before `/matt-slice` when that file exists. This phase walks through out-of-scope refactor candidates, creates approved GitHub issues, then asks for explicit confirmation before deleting `MATT-GRILL-NOTES.md`.
+After `/matt-spec`, run `/matt-refactors` before `/matt-tickets` when that file exists. This phase walks through out-of-scope refactor candidates, creates approved GitHub issues, then asks for explicit confirmation before deleting `MATT-GRILL-NOTES.md`.
 
 ## Architecture learning lens
 
@@ -189,7 +196,7 @@ Use `/matt-route-skills #123` to validate config and explain selected worker/rev
 
 Routing-aware commands hard-stop on invalid config, missing selected routed skills, or high-confidence overflow. Medium-confidence overflow is trimmed to the active cap after dedupe. Repo `disabledSkills` affects routed skills only; it does not remove the baseline worker skills.
 
-`/matt-slice` includes visible `## Agent skill hints` and machine-readable `matt-agent-skill-hints` JSON metadata in child issues when it creates them. These hints are low-authority diagnostics. `/matt-auto` and `/matt-afk <label>` still resolve the concrete queue issue inside their prompt-driven loops, so the extension cannot pre-route unresolved label/filter queues before launch; their prompts require routing the selected issue before implementation and stopping on invalid route results. Worker/review contracts include selected skill IDs, absolute `SKILL.md` paths, evidence-backed rationale, mandatory upfront reading guidance, and only a compact `Skill adjustments` note when the worker changes the proposed pack. Commit messages and closeout comments should describe the work and verification, not the skills used.
+`/matt-tickets` includes visible `## Agent skill hints` and machine-readable `matt-agent-skill-hints` JSON metadata in child issues when it creates them. These hints are low-authority diagnostics. `/matt-auto` and `/matt-afk <label>` still resolve the concrete queue issue inside their prompt-driven loops, so the extension cannot pre-route unresolved label/filter queues before launch; their prompts require routing the selected issue before implementation and stopping on invalid route results. Worker/review contracts include selected skill IDs, absolute `SKILL.md` paths, evidence-backed rationale, mandatory upfront reading guidance, and only a compact `Skill adjustments` note when the worker changes the proposed pack. Commit messages and closeout comments should describe the work and verification, not the skills used.
 
 ## Skill policy
 

@@ -1,81 +1,114 @@
 #!/usr/bin/env bun
-import { mkdtemp, rm, cp, mkdir, writeFile, readFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { $ } from "bun";
 
-type SourceMetadata = {
-	repo: string;
-	ref: string;
-	paths: string[];
-	updatedAt: string;
-};
+export type ChangeKind = "added" | "removed" | "changed";
+export type TreeChange = { category: string; path: string; kind: ChangeKind };
+type SourceMetadata = { repo: string; ref: string; paths: string[]; updatedAt: string };
 
-const REPO = "https://github.com/mattpocock/skills";
-// All upstream categories except deprecated. Local copies of these skills do
-// not belong in the environment's skills/ directory; vendor is canonical.
-const CATEGORIES = ["engineering", "productivity", "misc", "personal", "in-progress"];
+export const REPO = "https://github.com/mattpocock/skills";
+export const CATEGORIES = ["engineering", "productivity", "misc", "personal", "in-progress"] as const;
 const EXTENSION_ROOT = path.resolve(import.meta.dir, "..");
 const VENDOR_ROOT = path.join(EXTENSION_ROOT, "vendor", "mattpocock-skills");
 const SOURCE_JSON = path.join(VENDOR_ROOT, "SOURCE.json");
 
-const args = new Set(Bun.argv.slice(2));
-const dryRun = args.has("--dry-run");
+async function fileMap(root: string): Promise<Map<string, Uint8Array>> {
+	const result = new Map<string, Uint8Array>();
+	if (!existsSync(root)) return result;
+	async function visit(current: string): Promise<void> {
+		for (const entry of await readdir(current, { withFileTypes: true })) {
+			const absolute = path.join(current, entry.name);
+			if (entry.isDirectory()) await visit(absolute);
+			else if (entry.isFile()) result.set(path.relative(root, absolute), new Uint8Array(await readFile(absolute)));
+		}
+	}
+	await visit(root);
+	return result;
+}
 
-async function main() {
+function equalBytes(a: Uint8Array | undefined, b: Uint8Array | undefined): boolean {
+	if (!a || !b || a.length !== b.length) return false;
+	return a.every((value, index) => value === b[index]);
+}
+
+export async function compareCategoryTrees(upstreamSkillsRoot: string, vendorRoot: string): Promise<TreeChange[]> {
+	const changes: TreeChange[] = [];
+	for (const category of CATEGORIES) {
+		const upstream = await fileMap(path.join(upstreamSkillsRoot, category));
+		const vendored = await fileMap(path.join(vendorRoot, category));
+		for (const relativePath of new Set([...upstream.keys(), ...vendored.keys()])) {
+			const kind = !vendored.has(relativePath) ? "added" : !upstream.has(relativePath) ? "removed" : equalBytes(upstream.get(relativePath), vendored.get(relativePath)) ? undefined : "changed";
+			if (kind) changes.push({ category, path: relativePath, kind });
+		}
+	}
+	return changes.sort((a, b) => `${a.category}/${a.path}`.localeCompare(`${b.category}/${b.path}`));
+}
+
+export async function findDuplicateSkillNames(upstreamSkillsRoot: string): Promise<string[]> {
+	const owners = new Map<string, string[]>();
+	for (const category of CATEGORIES) {
+		const files = await fileMap(path.join(upstreamSkillsRoot, category));
+		for (const relativePath of files.keys()) {
+			if (path.basename(relativePath) !== "SKILL.md") continue;
+			const skillName = path.basename(path.dirname(relativePath));
+			owners.set(skillName, [...(owners.get(skillName) ?? []), `${category}/${path.dirname(relativePath)}`]);
+		}
+	}
+	return [...owners.entries()].filter(([, paths]) => paths.length > 1).map(([name, paths]) => `${name}: ${paths.join(", ")}`).sort();
+}
+
+export async function verifyExactCopy(upstreamSkillsRoot: string, vendorRoot: string): Promise<void> {
+	const differences = await compareCategoryTrees(upstreamSkillsRoot, vendorRoot);
+	if (differences.length) throw new Error(`Vendored copy verification failed: ${differences.slice(0, 10).map((item) => `${item.kind} ${item.category}/${item.path}`).join(", ")}`);
+	if (existsSync(path.join(vendorRoot, "deprecated"))) throw new Error("Deprecated category must not be vendored.");
+}
+
+export async function syncFromCheckout(cloneDir: string, vendorRoot: string, ref: string, dryRun = false): Promise<TreeChange[]> {
+	const upstreamSkillsRoot = path.join(cloneDir, "skills");
+	const missing = CATEGORIES.filter((category) => !existsSync(path.join(upstreamSkillsRoot, category)));
+	if (missing.length) throw new Error(`Expected upstream categor${missing.length === 1 ? "y" : "ies"} not found: ${missing.join(", ")}`);
+	const duplicates = await findDuplicateSkillNames(upstreamSkillsRoot);
+	if (duplicates.length) throw new Error(`Duplicate skill names across non-deprecated categories: ${duplicates.join("; ")}`);
+	const changes = await compareCategoryTrees(upstreamSkillsRoot, vendorRoot);
+	if (dryRun) return changes;
+
+	await mkdir(vendorRoot, { recursive: true });
+	await rm(path.join(vendorRoot, "deprecated"), { recursive: true, force: true });
+	for (const category of CATEGORIES) {
+		const destination = path.join(vendorRoot, category);
+		await rm(destination, { recursive: true, force: true });
+		await cp(path.join(upstreamSkillsRoot, category), destination, { recursive: true });
+	}
+	const licenseSource = path.join(cloneDir, "LICENSE");
+	if (existsSync(licenseSource)) await cp(licenseSource, path.join(vendorRoot, "LICENSE"));
+	await verifyExactCopy(upstreamSkillsRoot, vendorRoot);
+	const metadata: SourceMetadata = { repo: REPO, ref, paths: CATEGORIES.map((category) => `skills/${category}`), updatedAt: new Date().toISOString() };
+	await writeFile(path.join(vendorRoot, "SOURCE.json"), `${JSON.stringify(metadata, null, 2)}\n`);
+	return changes;
+}
+
+async function main(): Promise<void> {
+	const dryRun = new Set(Bun.argv.slice(2)).has("--dry-run");
 	const tempRoot = await mkdtemp(path.join(tmpdir(), "mattpocock-skills-"));
 	const cloneDir = path.join(tempRoot, "skills");
-
 	try {
-		await $`git clone --depth 1 ${REPO} ${cloneDir}`.quiet();
+		await $`git clone --depth 1 --branch main --single-branch ${REPO} ${cloneDir}`.quiet();
 		const ref = (await $`git -C ${cloneDir} rev-parse HEAD`.text()).trim();
-
-		const sourcePaths = CATEGORIES.map((category) => `skills/${category}`);
-		const missing = sourcePaths.filter((sourcePath) => !existsSync(path.join(cloneDir, sourcePath)));
-		if (missing.length > 0) {
-			throw new Error(`Expected upstream path(s) not found: ${missing.join(", ")}`);
-		}
-
-		const previous = existsSync(SOURCE_JSON) ? await readFile(SOURCE_JSON, "utf8") : "";
-		const metadata: SourceMetadata = {
-			repo: REPO,
-			ref,
-			paths: sourcePaths,
-			updatedAt: new Date().toISOString(),
-		};
-
-		if (dryRun) {
-			console.log(`Would sync ${REPO}: ${sourcePaths.join(", ")}`);
-			console.log(`Upstream HEAD: ${ref}`);
-			if (previous) console.log(`Previous SOURCE.json:\n${previous.trim()}`);
-			return;
-		}
-
-		await mkdir(VENDOR_ROOT, { recursive: true });
+		const changes = await syncFromCheckout(cloneDir, VENDOR_ROOT, ref, dryRun);
+		console.log(`${dryRun ? "Would sync" : "Synced"} ${REPO}`);
+		console.log(`Upstream HEAD: ${ref}`);
 		for (const category of CATEGORIES) {
-			const dest = path.join(VENDOR_ROOT, category);
-			await rm(dest, { recursive: true, force: true });
-			await cp(path.join(cloneDir, "skills", category), dest, { recursive: true });
+			const categoryChanges = changes.filter((item) => item.category === category);
+			console.log(`${category}: ${categoryChanges.length} path change(s)`);
+			for (const item of categoryChanges) console.log(`  ${item.kind} ${item.path}`);
 		}
-
-		const licenseSource = path.join(cloneDir, "LICENSE");
-		if (existsSync(licenseSource)) {
-			await cp(licenseSource, path.join(VENDOR_ROOT, "LICENSE"));
-		}
-
-		await writeFile(SOURCE_JSON, `${JSON.stringify(metadata, null, 2)}\n`);
-
-		console.log(`Synced Matt Pocock skills from ${REPO}`);
-		console.log(`Ref: ${ref}`);
-		console.log(`Categories: ${CATEGORIES.join(", ")}`);
-		console.log(`Destination: ${VENDOR_ROOT}`);
+		if (!dryRun) console.log(`Destination: ${VENDOR_ROOT}`);
 	} finally {
 		await rm(tempRoot, { recursive: true, force: true });
 	}
 }
 
-main().catch((error) => {
-	console.error(error instanceof Error ? error.message : error);
-	process.exit(1);
-});
+if (import.meta.main) main().catch((error) => { console.error(error instanceof Error ? error.message : error); process.exit(1); });

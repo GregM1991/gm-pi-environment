@@ -20,7 +20,7 @@ function formatPack(title: string, pack: SkillPack): string {
 	lines.push(pack.baseline.length ? pack.baseline.map(formatSelection).join("\n") : "- none");
 	lines.push(`Routed skills (${pack.routed.length}):`);
 	lines.push(pack.routed.length ? pack.routed.map(formatSelection).join("\n") : "- none");
-	if (pack.overflowHighConfidence) lines.push(`High-confidence overflow: yes — stop automation and re-slice before implementation.`);
+	if (pack.overflowHighConfidence) lines.push(`High-confidence overflow: yes — stop automation and split the ticket before implementation.`);
 	if (pack.skipped.length) {
 		lines.push("Skipped/considered skill selections:");
 		lines.push(pack.skipped.map(formatSkipped).join("\n"));
@@ -75,11 +75,11 @@ export function formatRoutingPromptContract(result: RouteResult): string {
 	].join("\n");
 }
 
-export function formatSliceSkillHintInstructions(validation: ValidationResult): string {
+export function formatTicketSkillHintInstructions(validation: ValidationResult): string {
 	return [
-		"Issue-aware skill routing for slicing:",
+		"Issue-aware skill routing for ticket creation:",
 		`- ${formatValidationDiagnostics(validation).replace(/\n/g, "\n- ")}`,
-		"- Because routing config is valid, include low-authority agent skill hints in each child issue you create.",
+		"- Because routing config is valid, include low-authority agent skill hints in each ticket you create.",
 		"- Add a visible Markdown section named `## Agent skill hints` with worker/review skill IDs, route IDs, and one-line evidence/rationale. Use `none` when there is no evidence-backed route.",
 		"- Add adjacent machine-readable metadata in an HTML comment exactly shaped as JSON: `<!-- matt-agent-skill-hints {\"version\":1,\"workerSkillIds\":[],\"reviewSkillIds\":[],\"routeIds\":[]} -->`.",
 		"- These hints are diagnostics, not binding instructions; auto mode recomputes routing from the final child issue state before implementation.",

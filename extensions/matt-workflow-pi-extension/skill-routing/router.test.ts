@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { buildRoutingContext, scaffoldSkillRoutesJson } from "./config";
-import { formatDryRun, formatRoutingPromptContract, formatSliceSkillHintInstructions } from "./format";
+import { formatDryRun, formatRoutingPromptContract, formatTicketSkillHintInstructions } from "./format";
 import { routeIssue } from "./router";
 
 let repoRoot = "";
@@ -131,9 +131,9 @@ describe("skill routing formatters", () => {
 		expect(formatted).toContain("Skill adjustments: none");
 	});
 
-	test("formats slice skill hint instructions from validation state", () => {
-		const valid = formatSliceSkillHintInstructions(buildRoutingContext(repoRoot, extensionRoot).validation);
-		expect(valid).toContain("Issue-aware skill routing for slicing:");
+	test("formats ticket skill hint instructions from validation state", () => {
+		const valid = formatTicketSkillHintInstructions(buildRoutingContext(repoRoot, extensionRoot).validation);
+		expect(valid).toContain("Issue-aware skill routing for ticket creation:");
 		expect(valid).toContain("Routing config validation passed.");
 		expect(valid).toContain("matt-agent-skill-hints");
 	});

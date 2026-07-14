@@ -21,7 +21,7 @@ If a later answer changes direction, append a new entry that supersedes the earl
 
 ## Potential refactors discovered during grilling
 
-Track only refactor candidates that are outside the PRD scope being grilled. If a discovery belongs in the PRD target, capture it in the grill Q&A/PRD context instead and leave it out of the refactor candidates section.
+Track only refactor candidates that are outside the spec scope being grilled. If a discovery belongs in the spec target, capture it in the grill Q&A/spec context instead and leave it out of the refactor candidates section.
 
 The potential refactors section is not append-only. Update and group it as understanding improves. Prefer groups such as:
 
@@ -37,7 +37,7 @@ Each candidate should include enough context to make a quick later decision:
 ### <short candidate title>
 
 - Why it surfaced: <grill context>
-- Why it is outside this PRD: <scope boundary>
+- Why it is outside this spec: <scope boundary>
 - Possible GitHub issue: <one-sentence issue shape>
 ```
 

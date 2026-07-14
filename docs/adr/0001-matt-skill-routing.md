@@ -12,5 +12,5 @@ Matt auto and AFK loops should route small, evidence-backed skill packs into imp
 
 - V1 uses extension TypeScript defaults plus optional strict JSON repo config at `.pi/matt-skill-routes.json`.
 - Missing routed skills, invalid route config, and high-confidence skill overflow are hard stops for routing-aware automation.
-- `/matt-slice` writes visible and machine-readable low-authority agent skill hints, while `/matt-auto` recomputes routing before implementation.
+- `/matt-tickets` writes visible and machine-readable low-authority agent skill hints, while `/matt-auto` recomputes routing before implementation.
 - Skill routing is guidance uplift, not audit ceremony; closeouts and commits describe changes and verification rather than named skills.
