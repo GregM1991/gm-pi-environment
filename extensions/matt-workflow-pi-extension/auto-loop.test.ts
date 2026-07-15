@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import mattWorkflowExtension, { isWayfinderPlanningIssue, phasePrompt } from "./index";
@@ -68,9 +68,27 @@ describe("Wayfinder automation boundaries", () => {
 		expect(auto).toContain(".pi/matt-review-ledger.jsonl");
 		expect(auto).toContain("append-only");
 		expect(auto).toContain("closed category taxonomy");
+		expect(auto).toContain("exactly as documented in `augmentations/auto.md`");
+		expect(auto).not.toContain("Require file:line findings, severity, one-line summaries");
 		expect(auto).toContain("same issue commit");
 		expect(auto).toContain("ledger records appended per issue");
 	}));
+
+	test("verdict-only PASS records omit every finding field, including the worker skill pack", () => {
+		const augmentation = readFileSync(path.join(import.meta.dir, "augmentations", "auto.md"), "utf8");
+		const passSection = augmentation.split("## Verdict-only PASS record")[1] ?? "";
+		const example = passSection.match(/```json\n(.+)\n```/)?.[1];
+
+		expect(passSection).toContain("It contains only `date`, `issue`, `cycle`, and `verdict`");
+		expect(passSection).toContain("`workerSkillPack`");
+		expect(example).toBeDefined();
+		expect(JSON.parse(example ?? "{}")).toEqual({
+			date: "2026-02-24T16:40:00.000Z",
+			issue: 42,
+			cycle: "fix-2",
+			verdict: "PASS",
+		});
+	});
 });
 
 describe("retro phase contract", () => {
@@ -80,7 +98,8 @@ describe("retro phase contract", () => {
 		expect(prompt).toContain("augmentations/retro.md");
 		expect(prompt).toContain(".pi/matt-review-ledger.jsonl");
 		expect(prompt).toContain("missing, empty, or malformed");
-		expect(prompt).toContain("line numbers");
+		expect(prompt).toContain("report every malformed line with its line number");
+		expect(prompt).not.toContain("malformed line numbers");
 		expect(prompt).toContain("within one issue");
 		expect(prompt).toContain("across issues");
 		expect(prompt).toContain("issue/cycle references");
@@ -88,6 +107,9 @@ describe("retro phase contract", () => {
 		expect(prompt).toContain("applied and skipped");
 		expect(prompt).toContain("Never rewrite, compact, or modify the ledger");
 		expect(prompt).toContain("vendor/mattpocock-skills");
+		expect(prompt).not.toContain("Architecture learning lens");
+		expect(prompt).not.toContain("improve-codebase-architecture/SKILL.md");
+		expect(prompt).not.toContain("Target:");
 	}));
 });
 
@@ -101,6 +123,22 @@ describe("command registration", () => {
 		expect(names).toContain("matt-retro");
 		expect(names).not.toContain("matt-prd");
 		expect(names).not.toContain("matt-slice");
+	});
+
+	test("retro is ledger-wide and offers no issue-target completions", () => {
+		type RegisteredCommand = { getArgumentCompletions?: (prefix: string) => unknown };
+		let retro: RegisteredCommand | undefined;
+		let spec: RegisteredCommand | undefined;
+		mattWorkflowExtension({
+			on() {},
+			registerCommand(name: string, command: RegisteredCommand) {
+				if (name === "matt-retro") retro = command;
+				if (name === "matt-spec") spec = command;
+			},
+		} as never);
+
+		expect(retro?.getArgumentCompletions).toBeUndefined();
+		expect(spec?.getArgumentCompletions).toBeFunction();
 	});
 
 	test("includes retro in the matt-profile summary", async () => {

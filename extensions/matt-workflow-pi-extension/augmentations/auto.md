@@ -37,8 +37,8 @@ Worked finding example:
 
 ## Verdict-only PASS record
 
-When a PASS review has no findings, append exactly one verdict-only record. It contains `date`, `issue`, `cycle`, `verdict`, and `workerSkillPack`; omit all finding-only fields (`location`, `severity`, `summary`, `category`, `whyMissed`, and `repeat`).
+When a PASS review has no findings, append exactly one verdict-only record. It contains only `date`, `issue`, `cycle`, and `verdict`; omit all finding-only fields (`location`, `severity`, `summary`, `category`, `whyMissed`, `workerSkillPack`, and `repeat`).
 
 ```json
-{"date":"2026-02-24T16:40:00.000Z","issue":42,"cycle":"fix-2","verdict":"PASS","workerSkillPack":["implement","tdd"]}
+{"date":"2026-02-24T16:40:00.000Z","issue":42,"cycle":"fix-2","verdict":"PASS"}
 ```

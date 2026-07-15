@@ -45,7 +45,7 @@ Auto mode then processes open, unblocked, `ready-for-agent` child issues seriall
 
 ## Auto-loop review ledger
 
-`/matt-auto` appends every review finding to `.pi/matt-review-ledger.jsonl` in the target repo, including the issue, review cycle, verdict, location, severity, category, why the finding was missed, active worker skill pack, and repeat status. Finding-free PASS reviews receive a verdict-only record, making pass rates and cycle counts computable from the ledger. The file is append-only and is committed with the issue it describes. Capture is auto-loop-only for now; `/matt-review` and targeted `/matt-afk` do not write it.
+`/matt-auto` appends review outcomes and findings to `.pi/matt-review-ledger.jsonl` in the target repo so review cycles, recurring misses, and pass rates remain available after the session. The file is append-only and is committed with the issue it describes. Capture is auto-loop-only for now; `/matt-review` and targeted `/matt-afk` do not write it. [`augmentations/auto.md`](./augmentations/auto.md) is the sole normative source for the record field list and closed taxonomy.
 
 Run `/matt-retro` after enough records accumulate to close the capture → retro improvement loop. Retro validates the complete ledger before analysis, separates repeat findings within one issue's fix cycles from patterns across issues, and cites issue/cycle records in concrete proposals. It never rewrites the ledger or vendored Matt skills, and it applies only proposals the user explicitly approves one by one. Missing, empty, or malformed ledgers stop the retrospective; malformed lines are reported by line number.
 
