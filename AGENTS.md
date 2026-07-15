@@ -3,6 +3,7 @@
 ## Purpose and Source of Truth
 
 - This repository is the canonical, portable Pi environment for shared skills, extensions, prompts, themes, references, and base configuration.
+- Perform all work that improves, changes, alters, or adjusts this Pi environment package or its Pi-consumed extensions in this repository checkout. Never edit the installed/runtime copy under `~/.pi/agent/git/github.com/GregM1991/gm-pi-environment` (or any other Pi harness package cache); publish or reinstall from this repository instead.
 - Install and register this Pi package from `git:github.com/GregM1991/gm-pi-environment`, not from a local cloned repository path. Use the clone for editing and publishing only.
 - Read `README.md` before changing installation, bootstrap, package-loading, or machine-local configuration behavior.
 - Keep shared resources here. Do not create duplicate same-named copies in `~/.agents/skills` or another Pi load path.
