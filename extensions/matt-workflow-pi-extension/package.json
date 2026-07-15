@@ -18,6 +18,7 @@
     "index.ts",
     "skill-routing/**/*",
     "conventions/**/*",
+    "review-ledger/**/*",
     "skills/**/*",
     "augmentations/**/*",
     "scripts/**/*",
@@ -27,8 +28,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "check": "bun --check index.ts scripts/sync-matt-skills.ts skill-routing/*.ts conventions/*.ts",
-    "test": "bun test auto-loop.test.ts scripts/*.test.ts skill-routing/*.test.ts conventions/*.test.ts",
+    "check": "bun --check index.ts scripts/sync-matt-skills.ts skill-routing/*.ts conventions/*.ts review-ledger/*.ts",
+    "test": "bun test auto-loop.test.ts scripts/*.test.ts skill-routing/*.test.ts conventions/*.test.ts review-ledger/*.test.ts",
     "sync:matt-skills": "bun scripts/sync-matt-skills.ts",
     "sync:matt-skills:dry-run": "bun scripts/sync-matt-skills.ts --dry-run"
   },

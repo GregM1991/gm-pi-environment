@@ -45,9 +45,11 @@ Auto mode then processes open, unblocked, `ready-for-agent` child issues seriall
 
 ## Auto-loop review ledger
 
-`/matt-auto` appends review outcomes and findings to `.pi/matt-review-ledger.jsonl` in the target repo so review cycles, recurring misses, and pass rates remain available after the session. The file is append-only and is committed with the issue it describes. Capture is auto-loop-only for now; `/matt-review` and targeted `/matt-afk` do not write it. [`augmentations/auto.md`](./augmentations/auto.md) is the sole normative source for the record field list and closed taxonomy.
+`/matt-auto` appends review outcomes and findings to `.pi/matt-review-ledger.jsonl` in the target repo so review cycles, recurring misses, and pass rates remain available after the session. New records identify their provenance as `source: "review-child"` or `source: "ai-gate"`; source-less legacy records remain valid and are interpreted as review-child evidence. The file is append-only and is committed with the issue it describes—old lines are never migrated. Capture is auto-loop-only for now; `/matt-review` and targeted `/matt-afk` do not write it. [`augmentations/auto.md`](./augmentations/auto.md) is the sole normative source for the record field list, mappings, and closed taxonomies.
 
-Run `/matt-retro` after enough records accumulate to close the capture → retro improvement loop. Retro validates the complete ledger before analysis, separates repeat findings within one issue's fix cycles from patterns across issues, and cites issue/cycle records in concrete proposals. It never rewrites the ledger or vendored Matt skills, and it applies only proposals the user explicitly approves one by one. Missing, empty, or malformed ledgers stop the retrospective; malformed lines are reported by line number.
+When `toolchain.commands.aiGate` is configured, auto mode runs it after every review child, records finding-free success as an AI-gate PASS, maps actionable findings to FIX, and records execution/parsing failure as a blocking `verification-skipped` finding. Same-cycle gate findings that match review-child findings by normalized location plus summary/evidence are suppressed so one miss is not counted twice; the loop log reports suppressed duplicates.
+
+Run `/matt-retro` after enough records accumulate to close the capture → retro improvement loop. Retro validates mixed legacy/new ledgers before analysis, reports findings and pass rates separately for review-child and AI-gate evidence, separates repeat findings within one issue's fix cycles from patterns across issues, and cites source/issue/cycle records in concrete proposals. It never rewrites the ledger or vendored Matt skills, and it applies only proposals the user explicitly approves one by one. Missing, empty, or malformed ledgers stop the retrospective; malformed lines are reported by line number.
 
 ## Milestone delivery arcs
 
@@ -173,7 +175,7 @@ All sections are optional except `version`. If the file is absent, existing dete
 
 Doc paths must be repo-relative local paths, must stay inside the repo, and must exist on disk. `tracker.type` supports only `github-issues` in v1. Most toolchain commands are hint-only; agents see them as preferred verification commands, but the extension does not execute them automatically. Supported command keys are `test`, `check`, `build`, and `aiGate`.
 
-`toolchain.commands.aiGate` is optional and review-phase specific. When present, `/matt-review` prompts require the agent to run that command and fold must-fix/should-fix findings into the verdict, or report the gate failure explicitly. Example: `"aiGate": "bun run ai-gate --base main --head HEAD"`.
+`toolchain.commands.aiGate` is optional and review-specific. When present, `/matt-review` prompts require the agent to run that command and fold must-fix/should-fix findings into the verdict, or report the gate failure explicitly. `/matt-auto` runs the command after every fresh review child and captures the gate as a distinct ledger source using the mapping and deduplication contract in [`augmentations/auto.md`](./augmentations/auto.md). Example: `"aiGate": "bun run ai-gate --base main --head HEAD"`.
 
 Use `/matt-init-conventions` to create the scaffold without overwriting an existing file.
 

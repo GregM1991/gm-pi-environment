@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import mattWorkflowExtension, { isWayfinderPlanningIssue, phasePrompt } from "./index";
@@ -70,16 +70,38 @@ describe("Wayfinder automation boundaries", () => {
 		expect(auto).toContain("closed category taxonomy");
 		expect(auto).toContain("exactly as documented in `augmentations/auto.md`");
 		expect(auto).not.toContain("Require file:line findings, severity, one-line summaries");
+		expect(auto).toContain('source: `review-child`');
 		expect(auto).toContain("same issue commit");
-		expect(auto).toContain("ledger records appended per issue");
+		expect(auto).toContain("ledger records appended per source per issue");
 	}));
 
-	test("verdict-only PASS records omit every finding field, including the worker skill pack", () => {
+	test("configured AI gate has a separate source-tagged ledger lifecycle", () => withRepo((cwd) => {
+		mkdirSync(path.join(cwd, ".pi"), { recursive: true });
+		writeFileSync(path.join(cwd, ".pi", "matt-conventions.json"), JSON.stringify({
+			version: 1,
+			toolchain: { runtime: "bun", commands: { aiGate: "bun run ai-gate" } },
+		}));
+
+		const auto = phasePrompt("auto", "ready-for-agent", cwd);
+		expect(auto).toContain("After every review child returns, run the configured AI gate");
+		expect(auto).toContain('source: `ai-gate`');
+		expect(auto).toContain("no findings → `PASS`");
+		expect(auto).toContain("actionable must-fix or should-fix findings → `FIX`");
+		expect(auto).toContain("execution/parsing failure or non-remediable blocking result → `BLOCKER`");
+		expect(auto).toContain("blocking `verification-skipped` finding");
+		expect(auto).toContain("same-cycle review-child finding");
+		expect(auto).toContain("normalized location plus summary/evidence");
+		expect(auto).toContain("combined cycle outcome across every configured review surface");
+		expect(auto).toContain("active implementation/fix worker skill pack");
+		expect(auto).toContain("Resolve every gate location to `file:line`");
+	}));
+
+	test("new verdict-only PASS records include source and omit every finding field", () => {
 		const augmentation = readFileSync(path.join(import.meta.dir, "augmentations", "auto.md"), "utf8");
 		const passSection = augmentation.split("## Verdict-only PASS record")[1] ?? "";
 		const example = passSection.match(/```json\n(.+)\n```/)?.[1];
 
-		expect(passSection).toContain("It contains only `date`, `issue`, `cycle`, and `verdict`");
+		expect(passSection).toContain("only `date`, `issue`, `cycle`, `verdict`, and `source`");
 		expect(passSection).toContain("`workerSkillPack`");
 		expect(example).toBeDefined();
 		expect(JSON.parse(example ?? "{}")).toEqual({
@@ -87,6 +109,7 @@ describe("Wayfinder automation boundaries", () => {
 			issue: 42,
 			cycle: "fix-2",
 			verdict: "PASS",
+			source: "review-child",
 		});
 	});
 });
@@ -102,6 +125,8 @@ describe("retro phase contract", () => {
 		expect(prompt).not.toContain("malformed line numbers");
 		expect(prompt).toContain("within one issue");
 		expect(prompt).toContain("across issues");
+		expect(prompt).toContain("source-less legacy records as `review-child`");
+		expect(prompt).toContain("separately for `review-child` and `ai-gate`");
 		expect(prompt).toContain("issue/cycle references");
 		expect(prompt).toContain("explicit per-proposal approval");
 		expect(prompt).toContain("applied and skipped");
