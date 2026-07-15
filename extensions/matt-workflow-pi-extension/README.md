@@ -42,6 +42,10 @@ When `/matt-auto` receives a specific GitHub issue or issue URL, it inspects tha
 
 Auto mode then processes open, unblocked, `ready-for-agent` child issues serially, respecting dependency text such as `blocked by #123`. After the initial implementation review, it may run up to three fix/review cycles for concrete findings; each cycle uses a fix worker followed by a separate fresh reviewer. A concrete `FIX` or `BLOCKER` verdict continues while that budget remains—`BLOCKER` alone does not stop automation unless resolution requires human judgment or another safety stop. After each child closeout it re-checks queue state. It stops when every child issue is complete, when remaining children are blocked or need human input, when the three-cycle remediation budget is exhausted without a passing review, or when the queue state is ambiguous. Parent issues are left open so the user can continue the Matt workflow pipeline manually.
 
+## Auto-loop review ledger
+
+`/matt-auto` appends every review finding to `.pi/matt-review-ledger.jsonl` in the target repo, including the issue, review cycle, verdict, location, severity, category, why the finding was missed, active worker skill pack, and repeat status. Finding-free PASS reviews receive a verdict-only record, making pass rates and cycle counts computable from the ledger. The file is append-only and is committed with the issue it describes. Capture is auto-loop-only for now; `/matt-review` and targeted `/matt-afk` do not write it.
+
 ## Milestone delivery arcs
 
 GitHub milestones are optional human-facing delivery arcs above the normal Matt workflow hierarchy. They group related specs and their descendant implementation tickets so a developer can see when a feature direction is ready to tie up in a bow.

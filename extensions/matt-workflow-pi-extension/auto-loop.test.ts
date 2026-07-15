@@ -61,6 +61,16 @@ describe("Wayfinder automation boundaries", () => {
 		expect(auto).toContain('context: "fresh"');
 		expect(auto).toContain("not to review, commit, close issues, or launch subagents");
 	}));
+
+	test("auto prompt carries the append-only review ledger lifecycle contract", () => withRepo((cwd) => {
+		const auto = phasePrompt("auto", "ready-for-agent", cwd);
+		expect(auto).toContain("augmentations/auto.md");
+		expect(auto).toContain(".pi/matt-review-ledger.jsonl");
+		expect(auto).toContain("append-only");
+		expect(auto).toContain("closed category taxonomy");
+		expect(auto).toContain("same issue commit");
+		expect(auto).toContain("ledger records appended per issue");
+	}));
 });
 
 describe("command registration", () => {
