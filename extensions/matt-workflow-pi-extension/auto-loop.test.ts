@@ -73,14 +73,44 @@ describe("Wayfinder automation boundaries", () => {
 	}));
 });
 
+describe("retro phase contract", () => {
+	test("requires validated evidence, distinct repeat signals, and per-proposal approval", () => withRepo((cwd) => {
+		const prompt = phasePrompt("retro", "", cwd);
+		expect(prompt).toContain(`- auto: ${path.join(import.meta.dir, "augmentations", "auto.md")} —`);
+		expect(prompt).toContain("augmentations/retro.md");
+		expect(prompt).toContain(".pi/matt-review-ledger.jsonl");
+		expect(prompt).toContain("missing, empty, or malformed");
+		expect(prompt).toContain("line numbers");
+		expect(prompt).toContain("within one issue");
+		expect(prompt).toContain("across issues");
+		expect(prompt).toContain("issue/cycle references");
+		expect(prompt).toContain("explicit per-proposal approval");
+		expect(prompt).toContain("applied and skipped");
+		expect(prompt).toContain("Never rewrite, compact, or modify the ledger");
+		expect(prompt).toContain("vendor/mattpocock-skills");
+	}));
+});
+
 describe("command registration", () => {
-	test("registers only canonical planning commands", () => {
+	test("registers canonical planning and insight commands", () => {
 		const names: string[] = [];
 		mattWorkflowExtension({ on() {}, registerCommand(name: string) { names.push(name); } } as never);
 		expect(names).toContain("matt-spec");
 		expect(names).toContain("matt-tickets");
 		expect(names).toContain("matt-wayfinder");
+		expect(names).toContain("matt-retro");
 		expect(names).not.toContain("matt-prd");
 		expect(names).not.toContain("matt-slice");
+	});
+
+	test("includes retro in the matt-profile summary", async () => {
+		let profile: { handler: (args: string, ctx: unknown) => Promise<void> } | undefined;
+		mattWorkflowExtension({
+			on() {},
+			registerCommand(name: string, command: typeof profile) { if (name === "matt-profile") profile = command; },
+		} as never);
+		let summary = "";
+		await profile?.handler("", { ui: { notify(message: string) { summary = message; } } });
+		expect(summary).toContain("/matt-retro");
 	});
 });

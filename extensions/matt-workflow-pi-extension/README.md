@@ -15,6 +15,7 @@ The extension is intentionally thin: it loads the `matt-workflow` orchestrator s
 - `/matt-afk <issue|label>` — fresh-context single-issue AFK implementation loop
 - `/matt-afk` — no-argument shorthand for the continuous auto-loop
 - `/matt-auto [filter|parent]` — continuously implement, review, commit, and close ready-for-agent issues until blocked; when passed a parent/spec issue, expands it into child issues and stops after the child queue is complete
+- `/matt-retro` — validate and analyze the review-findings ledger, then propose evidence-backed workflow improvements for explicit per-proposal approval
 - `/matt-route-skills <GitHub issue>` — read-only dry run that validates skill-routing config, fetches the issue with `gh`, and explains worker/review packs
 - `/matt-init-skill-routes` — scaffold `.pi/matt-skill-routes.json` only, refusing to overwrite an existing config
 - `/matt-init-conventions` — scaffold `.pi/matt-conventions.json` only, refusing to overwrite an existing config
@@ -45,6 +46,8 @@ Auto mode then processes open, unblocked, `ready-for-agent` child issues seriall
 ## Auto-loop review ledger
 
 `/matt-auto` appends every review finding to `.pi/matt-review-ledger.jsonl` in the target repo, including the issue, review cycle, verdict, location, severity, category, why the finding was missed, active worker skill pack, and repeat status. Finding-free PASS reviews receive a verdict-only record, making pass rates and cycle counts computable from the ledger. The file is append-only and is committed with the issue it describes. Capture is auto-loop-only for now; `/matt-review` and targeted `/matt-afk` do not write it.
+
+Run `/matt-retro` after enough records accumulate to close the capture → retro improvement loop. Retro validates the complete ledger before analysis, separates repeat findings within one issue's fix cycles from patterns across issues, and cites issue/cycle records in concrete proposals. It never rewrites the ledger or vendored Matt skills, and it applies only proposals the user explicitly approves one by one. Missing, empty, or malformed ledgers stop the retrospective; malformed lines are reported by line number.
 
 ## Milestone delivery arcs
 
