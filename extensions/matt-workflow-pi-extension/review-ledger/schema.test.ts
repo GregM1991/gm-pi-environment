@@ -82,7 +82,7 @@ describe("AI-gate ledger mapping", () => {
 		expect(mapAiGateVerdict({ status: "failure", findings: [] })).toBe("BLOCKER");
 	});
 
-	test("suppresses same-cycle AI-gate duplicates by normalized location and summary or evidence", () => {
+	test("suppresses per-issue AI-gate duplicates across review cycles by normalized location and summary or evidence", () => {
 		const reviewChildFindings = [{
 			location: "src/parser.ts:27",
 			summary: "Empty input bypasses validation",

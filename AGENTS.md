@@ -18,6 +18,7 @@
 - `prompts/`, `themes/`, and `references/` — package-provided resources declared by the root `package.json`.
 - `config/pi/` — portable base Pi configuration. Machine-specific values belong in local overlays, not this repository.
 - `docs/adr/` — durable architecture decisions.
+- `docs/investigations/` — investigation writeups.
 
 ## Implementation Conventions
 
