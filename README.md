@@ -9,7 +9,6 @@ This repo contains shared Pi skills, personal extensions, and portable config so
 - `skills/` — shared skills that should be available everywhere Pi is used.
 - `extensions/` — personal Pi extensions folded into this environment package.
 - `prompts/` — shared prompt templates.
-- `references/` — shared reference docs used by prompts, skills, and agents.
 - `config/pi/AGENTS.md` — global Pi agent instructions.
 - `config/pi/settings.base.json` — portable global Pi settings and standard packages. Machine-specific models and other overrides belong in the local overlay described below.
 - `config/pi/mcp.json` — portable MCP config. Machine-specific servers and credentials belong in the local overlay described below.

@@ -34,7 +34,7 @@ If the context is not enough to write a specific PR body, inspect the current br
 
 ## Style rules
 
-- Use my writing profile in this repository at `references/writing-style.md`.
+- Load and follow the available `writing-style` skill before drafting. Do not look for a repository-relative style file.
 - Casual, direct, practical, plain-English.
 - No em dashes.
 - Avoid colon-heavy AI-ish phrasing.
