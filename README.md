@@ -69,7 +69,7 @@ Keep credentials and machine-specific MCP servers in `mcp.local.json`; do not co
 
 `config/pi/settings.base.json` pins the builtin Pi subagent roles used across projects and workflows:
 
-- `worker` — `openai-codex/gpt-5.6-sol` with `low` thinking.
+- `worker` — `openai-codex/gpt-5.6-sol` with `high` thinking.
 - `reviewer` — `openai-codex/gpt-5.6-sol` with `high` thinking.
 
 These user-scope `subagents.agentOverrides` apply to every Pi project after bootstrap unless a project `.pi/settings.json` or an explicit per-run override takes precedence. The Matt auto-loop also names these builtin roles and requires `context: "fresh"` for both.
