@@ -10,6 +10,8 @@
 
 For commands, logs, tests, API calls, git history, large files, browser snapshots, or any output that might exceed a few lines, use the context-mode skill/tools. Prefer `ctx_execute`, `ctx_execute_file`, `ctx_batch_execute`, `ctx_fetch_and_index`, and `ctx_search` over raw Bash/read output. Read the `context-mode` skill before large-output work if its detailed workflow is needed.
 
+Use native `read` or `hypa_read` for Pi resources outside the current project root, especially `SKILL.md` files under `~/.pi/agent`; `ctx_execute_file` is workspace-confined unless the path is explicitly allowlisted.
+
 ## Hypa and context-mode
 
 Use context-mode (`ctx_execute`, `ctx_batch_execute`, `ctx_execute_file`, `ctx_search`) for large-output analysis, tests, logs, command aggregation, indexing, and retrieval.
