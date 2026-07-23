@@ -21,8 +21,8 @@ If the context is not enough to write a specific PR body, inspect the current br
 
 - `## QA`
   - Include when useful for reviewers.
-  - Explain how to set up locally for testing the feature or bug fix.
-  - Include any specific flows, accounts, fixtures, commands, env vars, or data needed to verify the change.
+  - A concise step-by-step guide to get a reviewer to a place where they can test the actual functionality (e.g. navigate here, do this action, use this account/fixture/flag, look for this result), including specific flows, accounts, fixtures, env vars, or data needed to get into the right state to verify the change.
+  - Do not include repo/build/verification commands like `npm run ...`, `npx ...`, `yarn ...`, test runners, linters, or type-checkers. Focus purely on manual functional verification steps.
 - `## Test plan`
   - Include only when I explicitly ask for it, or when the PR genuinely needs a separate test-plan section beyond QA.
 
