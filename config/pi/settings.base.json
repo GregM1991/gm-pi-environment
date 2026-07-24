@@ -14,7 +14,6 @@
   "packages": [
     "npm:pi-web-access",
     "npm:pi-subagents",
-    "npm:context-mode",
     "npm:pi-mcp-adapter",
     "npm:pi-hermes-memory",
     "npm:pi-powerline-footer",
