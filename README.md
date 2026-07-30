@@ -7,7 +7,7 @@ This repo contains shared Pi skills, personal extensions, and portable config so
 ## Contents
 
 - `skills/` — shared skills that should be available everywhere Pi is used.
-- `extensions/` — personal Pi extensions folded into this environment package.
+- `extensions/` — personal Pi extensions folded into this environment package, including first-class `fd` and `rg` search tools.
 - `prompts/` — shared prompt templates.
 - `config/pi/AGENTS.md` — global Pi agent instructions.
 - `config/pi/settings.base.json` — portable global Pi settings and standard packages. Machine-specific models and other overrides belong in the local overlay described below.
@@ -75,6 +75,10 @@ Keep credentials and machine-specific MCP servers in `mcp.local.json`; do not co
 These user-scope `subagents.agentOverrides` apply to every Pi project after bootstrap unless a project `.pi/settings.json` or an explicit per-run override takes precedence. The Matt auto-loop also names these builtin roles and requires `context: "fresh"` for both.
 
 The auto-loop parent is the current Pi session, not another named subagent. For an economical orchestrator with stronger worker/reviewer children, launch a dedicated parent with `pi --model provider/model:thinking` and keep child role pins in the machine-local settings overlay. A machine-local `defaultModel` changes every new parent session, not only auto mode; Pi currently has no command/phase-specific model setting. See [Auto-loop orchestrator model selection](docs/investigations/auto-loop-orchestrator-model-selection.md) for configuration, precedence, evidence, and the capability gap.
+
+## File search tools
+
+The `file-search` extension registers `fd` (file discovery) and `rg` (content search) as model tools. It prefers system binaries (`fd`/`fdfind` and `rg`), then cached package binaries, and otherwise downloads verified official releases on supported macOS/Linux arm64/x64 systems.
 
 ## Local-only resources
 
