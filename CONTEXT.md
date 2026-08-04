@@ -82,6 +82,10 @@ _Avoid_: claimed done, vibes-based closeout
 Short deep-module teaching checkpoints (Module, Interface, Implementation, Depth, Seam, Adapter, Leverage, Locality) that exercise the user's own mental model. Used only in human-present phases, never in AFK or Auto Loop workers.
 _Avoid_: automatic architecture review, unattended teaching
 
+**Matt Workflow Operations Module**:
+A reusable Pi Module whose tool Interface exposes bounded, deterministic read and mutation operations while hiding tracker, API, process Implementation details, and operation-level invariants. Matt phases are its first client, but its operations may serve other Pi workflows when the same domain behavior is needed. Each mutation has narrow semantics and structured evidence; the Module does not expose generic command execution or orchestrate entire phases.
+_Avoid_: Matt command wrappers, general automation framework, generic command runner, phase executor
+
 ### Issue Tracker
 
 **PRD Issue**:
