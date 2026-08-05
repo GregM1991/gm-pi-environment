@@ -10,10 +10,28 @@ export type TreeChange = { category: string; path: string; kind: ChangeKind };
 type SourceMetadata = { repo: string; ref: string; paths: string[]; updatedAt: string };
 
 export const REPO = "https://github.com/mattpocock/skills";
-export const CATEGORIES = ["engineering", "productivity", "misc", "personal", "in-progress"] as const;
+const EXCLUDED_CATEGORIES = new Set(["deprecated"]);
 const EXTENSION_ROOT = path.resolve(import.meta.dir, "..");
 const VENDOR_ROOT = path.join(EXTENSION_ROOT, "vendor", "mattpocock-skills");
-const SOURCE_JSON = path.join(VENDOR_ROOT, "SOURCE.json");
+
+async function directoryNames(root: string): Promise<string[]> {
+	if (!existsSync(root)) return [];
+	return (await readdir(root, { withFileTypes: true }))
+		.filter((entry) => entry.isDirectory())
+		.map((entry) => entry.name)
+		.sort();
+}
+
+export async function nonDeprecatedCategories(upstreamSkillsRoot: string): Promise<string[]> {
+	return (await directoryNames(upstreamSkillsRoot)).filter((category) => !EXCLUDED_CATEGORIES.has(category));
+}
+
+async function categoryNamesForTrees(upstreamSkillsRoot: string, vendorRoot: string): Promise<string[]> {
+	return [...new Set([
+		...await nonDeprecatedCategories(upstreamSkillsRoot),
+		...(await directoryNames(vendorRoot)).filter((category) => !EXCLUDED_CATEGORIES.has(category)),
+	])].sort();
+}
 
 async function fileMap(root: string): Promise<Map<string, Uint8Array>> {
 	const result = new Map<string, Uint8Array>();
@@ -36,7 +54,7 @@ function equalBytes(a: Uint8Array | undefined, b: Uint8Array | undefined): boole
 
 export async function compareCategoryTrees(upstreamSkillsRoot: string, vendorRoot: string): Promise<TreeChange[]> {
 	const changes: TreeChange[] = [];
-	for (const category of CATEGORIES) {
+	for (const category of await categoryNamesForTrees(upstreamSkillsRoot, vendorRoot)) {
 		const upstream = await fileMap(path.join(upstreamSkillsRoot, category));
 		const vendored = await fileMap(path.join(vendorRoot, category));
 		for (const relativePath of new Set([...upstream.keys(), ...vendored.keys()])) {
@@ -49,7 +67,7 @@ export async function compareCategoryTrees(upstreamSkillsRoot: string, vendorRoo
 
 export async function findDuplicateSkillNames(upstreamSkillsRoot: string): Promise<string[]> {
 	const owners = new Map<string, string[]>();
-	for (const category of CATEGORIES) {
+	for (const category of await nonDeprecatedCategories(upstreamSkillsRoot)) {
 		const files = await fileMap(path.join(upstreamSkillsRoot, category));
 		for (const relativePath of files.keys()) {
 			if (path.basename(relativePath) !== "SKILL.md") continue;
@@ -68,24 +86,24 @@ export async function verifyExactCopy(upstreamSkillsRoot: string, vendorRoot: st
 
 export async function syncFromCheckout(cloneDir: string, vendorRoot: string, ref: string, dryRun = false): Promise<TreeChange[]> {
 	const upstreamSkillsRoot = path.join(cloneDir, "skills");
-	const missing = CATEGORIES.filter((category) => !existsSync(path.join(upstreamSkillsRoot, category)));
-	if (missing.length) throw new Error(`Expected upstream categor${missing.length === 1 ? "y" : "ies"} not found: ${missing.join(", ")}`);
+	const categories = await nonDeprecatedCategories(upstreamSkillsRoot);
+	if (!categories.length) throw new Error("No non-deprecated upstream skill categories found.");
 	const duplicates = await findDuplicateSkillNames(upstreamSkillsRoot);
 	if (duplicates.length) throw new Error(`Duplicate skill names across non-deprecated categories: ${duplicates.join("; ")}`);
 	const changes = await compareCategoryTrees(upstreamSkillsRoot, vendorRoot);
 	if (dryRun) return changes;
 
 	await mkdir(vendorRoot, { recursive: true });
-	await rm(path.join(vendorRoot, "deprecated"), { recursive: true, force: true });
-	for (const category of CATEGORIES) {
-		const destination = path.join(vendorRoot, category);
-		await rm(destination, { recursive: true, force: true });
-		await cp(path.join(upstreamSkillsRoot, category), destination, { recursive: true });
+	for (const category of await directoryNames(vendorRoot)) {
+		await rm(path.join(vendorRoot, category), { recursive: true, force: true });
+	}
+	for (const category of categories) {
+		await cp(path.join(upstreamSkillsRoot, category), path.join(vendorRoot, category), { recursive: true });
 	}
 	const licenseSource = path.join(cloneDir, "LICENSE");
 	if (existsSync(licenseSource)) await cp(licenseSource, path.join(vendorRoot, "LICENSE"));
 	await verifyExactCopy(upstreamSkillsRoot, vendorRoot);
-	const metadata: SourceMetadata = { repo: REPO, ref, paths: CATEGORIES.map((category) => `skills/${category}`), updatedAt: new Date().toISOString() };
+	const metadata: SourceMetadata = { repo: REPO, ref, paths: categories.map((category) => `skills/${category}`), updatedAt: new Date().toISOString() };
 	await writeFile(path.join(vendorRoot, "SOURCE.json"), `${JSON.stringify(metadata, null, 2)}\n`);
 	return changes;
 }
@@ -97,10 +115,11 @@ async function main(): Promise<void> {
 	try {
 		await $`git clone --depth 1 --branch main --single-branch ${REPO} ${cloneDir}`.quiet();
 		const ref = (await $`git -C ${cloneDir} rev-parse HEAD`.text()).trim();
+		const categories = await categoryNamesForTrees(path.join(cloneDir, "skills"), VENDOR_ROOT);
 		const changes = await syncFromCheckout(cloneDir, VENDOR_ROOT, ref, dryRun);
 		console.log(`${dryRun ? "Would sync" : "Synced"} ${REPO}`);
 		console.log(`Upstream HEAD: ${ref}`);
-		for (const category of CATEGORIES) {
+		for (const category of categories) {
 			const categoryChanges = changes.filter((item) => item.category === category);
 			console.log(`${category}: ${categoryChanges.length} path change(s)`);
 			for (const item of categoryChanges) console.log(`  ${item.kind} ${item.path}`);

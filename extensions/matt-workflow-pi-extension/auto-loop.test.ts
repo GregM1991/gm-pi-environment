@@ -317,6 +317,28 @@ describe("retro phase contract", () => {
 	}));
 });
 
+describe("resource discovery", () => {
+	test("registers every synced non-deprecated vendor category", async () => {
+		type ResourceResult = { skillPaths: string[] } | undefined;
+		let discover: (() => Promise<ResourceResult>) | undefined;
+		mattWorkflowExtension({
+			on(event: string, handler: () => Promise<ResourceResult>) {
+				if (event === "resources_discover") discover = handler;
+			},
+			registerCommand() {},
+		} as never);
+
+		const source = JSON.parse(readFileSync(path.join(import.meta.dir, "vendor", "mattpocock-skills", "SOURCE.json"), "utf8"));
+		const expectedVendorPaths = source.paths.map((sourcePath: string) => path.join(import.meta.dir, "vendor", "mattpocock-skills", path.basename(sourcePath)));
+		const resources = await discover?.();
+		expect(resources?.skillPaths).toEqual([
+			path.join(import.meta.dir, "skills"),
+			...expectedVendorPaths,
+		]);
+		expect(resources?.skillPaths.some((skillPath) => skillPath.endsWith("/deprecated"))).toBe(false);
+	});
+});
+
 describe("command registration", () => {
 	test("registers canonical planning and insight commands", () => {
 		const names: string[] = [];

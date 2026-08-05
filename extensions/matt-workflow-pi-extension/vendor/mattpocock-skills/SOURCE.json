@@ -1,12 +1,11 @@
 {
   "repo": "https://github.com/mattpocock/skills",
-  "ref": "2ab958093e83e0ec752e6c1c5932da465bf23e0c",
+  "ref": "8b36d4fb2635b3c21998dcd8144439c9e5ba7302",
   "paths": [
     "skills/engineering",
-    "skills/productivity",
+    "skills/in-progress",
     "skills/misc",
-    "skills/personal",
-    "skills/in-progress"
+    "skills/productivity"
   ],
-  "updatedAt": "2026-07-30T23:44:09.360Z"
+  "updatedAt": "2026-08-05T21:30:18.282Z"
 }
