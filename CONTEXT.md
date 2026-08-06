@@ -78,6 +78,22 @@ _Avoid_: worker-orchestrator hybrid
 The verification artifacts — diff/commits, test results, review findings — required before closeout may close an issue. Missing evidence means relabel and stop, not close.
 _Avoid_: claimed done, vibes-based closeout
 
+**Review Run**:
+One execution of one review surface for an issue and cycle, yielding either a finding-free PASS or a set of Review Findings.
+_Avoid_: issue review history, issue-cycle-source tuple
+
+**Review Finding**:
+One actionable observation emitted by a Review Run and recorded independently in the Review Ledger.
+_Avoid_: review result, recurring class
+
+**Finding Antecedent**:
+The earlier Review Finding cited as direct evidence that a later finding repeats.
+_Avoid_: recurring-class key, repeat classification
+
+**Recurring Class**:
+The stable equivalence class shared by substantially similar Review Findings across issues.
+_Avoid_: antecedent finding, category
+
 **Architecture Learning Lens**:
 Short deep-module teaching checkpoints (Module, Interface, Implementation, Depth, Seam, Adapter, Leverage, Locality) that exercise the user's own mental model. Used only in human-present phases, never in AFK or Auto Loop workers.
 _Avoid_: automatic architecture review, unattended teaching
