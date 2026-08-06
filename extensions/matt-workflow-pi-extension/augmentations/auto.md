@@ -14,33 +14,35 @@ Implementation and fix children keep complete verification output in `.pi/matt-v
 
 Use focused tests during intermediate implementation and fix edits. Run the complete repo check once when the implementation pass or fix cycle is complete. That result satisfies the mandatory pre-commit full check if no code or verification-relevant inputs change afterward. Routine review results, ledger appends, compact summary or review-packet updates, and verification-log bookkeeping do not invalidate the completed check: proceed to commit without repeating it. Rerun the complete check immediately before the commit only after actual remediation, code changes, or other verification-relevant input changes, with output redirected to the issue's pre-commit log; never require two identical consecutive full checks.
 
-## Append-only JSONL and provenance
+## Append-only JSONL and versioning
 
 Append one compact JSON object per line. Never rewrite, reorder, delete, migrate, or reformat existing records. Create `.pi/` and the ledger when needed. Use an ISO 8601 UTC timestamp in `date`.
 
-Every new record requires `source`, with one of these closed values:
+Unversioned records are legacy. They continue to use the original finding or verdict-only PASS shapes exactly as before: `source` may be omitted and then means `review-child`, finding severity remains any non-empty string, finding verdict may be `PASS`, `FIX`, or `BLOCKER`, and verdict-only PASS omits `workerSkillPack`. Reject an unversioned record that adds v2-only fields. Mixed legacy/v2 ledgers are valid, and existing lines are never migrated.
 
-- `review-child`: outcome returned by the fresh review child
-- `ai-gate`: outcome produced by the configured `toolchain.commands.aiGate`
-
-Legacy records without `source` remain valid and mean `review-child`. This compatibility rule is validation-only: all newly appended records must include `source`.
-
-## Finding record
-
-For every novel finding, append one record with these fields:
+Every newly appended record uses `schemaVersion: 2` and requires:
 
 - `date`: ISO 8601 UTC timestamp
-- `issue`: GitHub issue number
+- `issue`: positive GitHub issue number
 - `cycle`: `initial`, `fix-1`, `fix-2`, or `fix-3`
-- `verdict`: `PASS`, `FIX`, or `BLOCKER`
 - `source`: `review-child` or `ai-gate`
+- `runId`: a canonical lowercase RFC 4122 UUIDv4 naming this one review execution
+- `workerSkillPack`: the non-empty skill-ID list active for the implementation or fix worker in this cycle
+
+Reject any present `schemaVersion` other than `2`. One v2 run is exactly one verdict-only PASS record or one-or-more finding records. Every record sharing a `runId` must share issue, cycle, source, and worker skill pack; never reuse a run ID for incompatible metadata.
+
+## V2 finding record
+
+For every novel finding, append one v2 record with the common fields above plus:
+
+- `verdict`: `FIX` or `BLOCKER`; never `PASS`
+- `findingId`: a globally unique canonical lowercase RFC 4122 UUIDv4
 - `location`: primary review location as `file:line`
-- `severity`: source-reported severity, or `blocking` for gate execution/parsing failure
+- `severity`: for `review-child`, `high`, `medium`, `low`, or `blocking`; for `ai-gate`, `must-fix`, `should-fix`, `non-remediable-blocker`, or `blocking`. Reserve `blocking` for synthesized execution/parsing failures recorded as `BLOCKER`/`verification-skipped`
 - `summary`: one-line finding summary
 - `category`: one value from the closed category taxonomy below
 - `whyMissed`: the source's stated reason, or the orchestrator's one-line classification of what the worker did not take into account
-- `workerSkillPack`: skill IDs active for the implementation or fix worker in this cycle
-- `repeat`: `none`, `earlier-cycle`, or `earlier-issue`; use `earlier-cycle` when substantially the same finding appeared in an earlier review cycle for this issue, otherwise `earlier-issue` when it appeared on a prior issue
+- `repeat`: `none`, `earlier-cycle`, or `earlier-issue`
 
 The closed category taxonomy is:
 
@@ -51,31 +53,37 @@ The closed category taxonomy is:
 - `architecture`
 - `verification-skipped`
 
-Worked review-child finding:
+Repeat provenance is exact:
+
+- `repeat: "none"` omits `repeatsFindingId`, `repeatsLegacyLine`, and `recurringClassKey`.
+- `repeat: "earlier-cycle"` includes exactly one antecedent reference: `repeatsFindingId` for a strictly earlier v2 finding or `repeatsLegacyLine` for a strictly earlier unversioned finding's positive JSONL line number. The antecedent must use the same issue and a strictly earlier cycle. Omit `recurringClassKey`.
+- `repeat: "earlier-issue"` includes exactly one antecedent reference under the same v2-ID/legacy-line rule, the antecedent must use a different issue, and `recurringClassKey` is required.
+
+Worked review-child finding that repeats a v2 antecedent:
 
 ```json
-{"date":"2026-02-24T16:30:00.000Z","issue":42,"cycle":"fix-1","verdict":"FIX","source":"review-child","location":"src/parser.ts:27","severity":"major","summary":"Empty input bypasses the required validation error","category":"spec-miss","whyMissed":"Worker covered the happy path but did not check the empty-input acceptance criterion","workerSkillPack":["implement","tdd"],"repeat":"earlier-cycle"}
+{"schemaVersion":2,"date":"2026-02-24T16:30:00.000Z","issue":42,"cycle":"fix-1","verdict":"FIX","source":"review-child","runId":"f0972154-f921-4df1-9c25-ae684a47cfe4","workerSkillPack":["implement","tdd"],"findingId":"a1564dc6-eb2f-42ac-93a4-e60c97b2a419","location":"src/parser.ts:27","severity":"medium","summary":"Empty input bypasses the required validation error","category":"spec-miss","whyMissed":"Worker covered the happy path but did not check the empty-input acceptance criterion","repeat":"earlier-cycle","repeatsFindingId":"360204b2-ee3e-46b3-bf7d-17b1a4e7db74"}
 ```
 
-## Verdict-only PASS record
+## V2 verdict-only PASS record
 
-When a review surface succeeds with no findings, append exactly one verdict-only record. A new record contains only `date`, `issue`, `cycle`, `verdict`, and `source`; omit all finding-only fields (`location`, `severity`, `summary`, `category`, `whyMissed`, `workerSkillPack`, and `repeat`).
+When a review surface succeeds with no findings, append exactly one v2 verdict-only record. It contains only the v2 common fields plus `verdict: "PASS"`; `workerSkillPack` is required, while all finding-only and repeat-provenance fields are omitted.
 
 ```json
-{"date":"2026-02-24T16:40:00.000Z","issue":42,"cycle":"fix-2","verdict":"PASS","source":"review-child"}
+{"schemaVersion":2,"date":"2026-02-24T16:40:00.000Z","issue":42,"cycle":"fix-2","verdict":"PASS","source":"review-child","runId":"62bef605-bd95-49a4-aec3-d70e01bb3d8a","workerSkillPack":["implement","tdd"]}
 ```
 
 ## Review-child capture
 
-After every initial or fix-cycle review child returns, append `source: "review-child"` records for that outcome: one per finding, or one verdict-only PASS when it reports no findings. Use the active issue, cycle, and implementation/fix worker skill pack.
+After every initial or fix-cycle review child returns, generate one `runId` for that execution and append `source: "review-child"` v2 records for its outcome: one per finding with a distinct `findingId`, or one verdict-only PASS when it reports no findings. Use the active issue, cycle, and implementation/fix worker skill pack.
 
 ## Recurring-class identity
 
-When classifying a finding as `repeat: "earlier-issue"`, first compare it by judgment against the recurring classes already recorded in the current run. If it matches an existing class, assign it to that class and reuse the class's key. Only a genuinely new recurring class derives a fresh deterministic key without adding a ledger field. For that derivation, normalize the closed `category` as-is. Normalize `summary` with Unicode NFKC, lowercase, trim and collapse whitespace, replace every maximal decimal-digit run with `#`, and remove ASCII punctuation; then join category and normalized summary as `<category>|<summary>`. `whyMissed` and location are evidence, not identity. The assigned key is the canonical string for the injected pitfall-note map, open prevention-issue search/deduplication (embed and search for it verbatim in the prevention issue body), and later-in-run stop-rule comparison. Thus all three decisions share one identity while the ledger schema and taxonomies remain unchanged.
+When classifying a v2 finding as `repeat: "earlier-issue"`, first compare it by judgment against the recurring classes already recorded in the current run. If it matches an existing class, assign it to that class and persist the class's existing key in `recurringClassKey`. Only a genuinely new recurring class derives a fresh deterministic key. For that derivation, normalize the closed `category` as-is. Normalize `summary` with Unicode NFKC, lowercase, trim and collapse whitespace, replace every maximal decimal-digit run with `#`, and remove other ASCII punctuation; then join category and normalized summary as `<category>|<summary>`. `whyMissed` and location are evidence, not identity. The persisted key is the canonical string for ledger analysis, the injected pitfall-note map, open prevention-issue search/deduplication (embed and search for it verbatim in the prevention issue body), and later-in-run stop-rule comparison. Thus all decisions share one identity.
 
 ## AI-gate capture and verdict mapping
 
-When `toolchain.commands.aiGate` is configured, run it exactly once per issue, after the issue's review has passed and its commit exists, but before closeout. Do not run it after review children. Capture its outcome separately with `source: "ai-gate"`, using the latest completed review cycle in the unchanged ledger record shape.
+When `toolchain.commands.aiGate` is configured, run it exactly once per issue, after the issue's review has passed and its commit exists, but before closeout. Do not run it after review children. Capture its outcome separately with `source: "ai-gate"`, using the latest completed review cycle and the v2 record shape.
 
 Map gate results deterministically:
 
@@ -83,7 +91,7 @@ Map gate results deterministically:
 - actionable must-fix or should-fix findings → `FIX`
 - execution/parsing failure or a non-remediable blocking result → `BLOCKER`
 
-Append one record per novel gate finding. Classify each novel gate finding's `repeat` value under the unchanged finding-record rules. Any novel AI-gate finding classified `repeat: "earlier-issue"` enters exactly the same recurring-class machinery as a review-child finding: assign its recurring class and key under **Recurring-class identity**, inject the pitfall note into all remaining implementation and fix-child contracts, file or reuse the prevention issue, and count it toward the prevention stop rule. If the gate succeeds with no findings, append one source-tagged verdict-only PASS. For execution/parsing failure, append a blocking finding with category `verification-skipped`, severity `blocking`, and a concise failure summary; never silently omit failed gate evidence.
+Append one record per novel gate finding, assigning one run UUID to the gate execution and a distinct finding UUID to each record. Classify each novel gate finding's `repeat` value under the v2 finding-record rules. Any novel AI-gate finding classified `repeat: "earlier-issue"` enters exactly the same recurring-class machinery as a review-child finding: assign its recurring class and key under **Recurring-class identity**, inject the pitfall note into all remaining implementation and fix-child contracts, file or reuse the prevention issue, and count it toward the prevention stop rule. If the gate succeeds with no findings, append one source-tagged verdict-only PASS. AI-gate severity and verdict combinations are deterministic: `must-fix` and `should-fix` use `FIX`; `non-remediable-blocker` uses `BLOCKER`; and `blocking` is reserved for synthesized execution/parsing failures, uses `BLOCKER`, and has category `verification-skipped`. For execution/parsing failure, append that blocking finding with a concise failure summary; never silently omit failed gate evidence.
 
 Every finding requires a primary `file:line`. When gate output supplies only a file path, inspect its evidence and the committed issue diff to choose the most specific implicated line; if no narrower line can be established, use line 1. When execution/parsing fails without an implicated repo file, use `.pi/matt-conventions.json:1`, where the command is configured.
 
@@ -97,4 +105,4 @@ Do not double-count an AI-gate finding already emitted by any review child for t
 2. Normalize summary and evidence with Unicode NFKC, lowercase, trimmed/collapsed whitespace.
 3. Treat findings as duplicates when normalized locations match and either normalized summaries or non-empty normalized evidence match.
 
-Append only novel AI-gate findings. If every gate finding is a same-issue duplicate, append no AI-gate record and report the suppressed duplicate count in the loop log; do not append a PASS because the gate did report findings. Across cycles and issues, preserve recurrence through the existing `repeat` field—never add a new repeat value implicitly.
+Append only novel AI-gate findings. If every gate finding is a same-issue duplicate, append no AI-gate record and report the suppressed duplicate count in the loop log; do not append a PASS because the gate did report findings. Across cycles and issues, preserve recurrence through `repeat` plus the required v2 antecedent reference and, for `earlier-issue`, `recurringClassKey`; never add a new repeat value implicitly.

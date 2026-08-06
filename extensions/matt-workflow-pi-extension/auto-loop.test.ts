@@ -178,9 +178,14 @@ describe("Wayfinder automation boundaries", () => {
 		expect(auto).toContain("whether the prevention stop rule fired");
 
 		const augmentation = readFileSync(path.join(import.meta.dir, "augmentations", "auto.md"), "utf8");
+		expect(augmentation).toContain("Unversioned records are legacy");
+		expect(augmentation).toContain("Every newly appended record uses `schemaVersion: 2`");
+		expect(augmentation).toContain("`repeatsFindingId`");
+		expect(augmentation).toContain("`repeatsLegacyLine`");
+		expect(augmentation).not.toContain("reviewedCommitSha");
 		expect(augmentation).toContain("## Recurring-class identity");
 		expect(augmentation).toContain("first compare it by judgment against the recurring classes already recorded in the current run");
-		expect(augmentation).toContain("assign it to that class and reuse the class's key");
+		expect(augmentation).toContain("persist the class's existing key in `recurringClassKey`");
 		expect(augmentation).toContain("Only a genuinely new recurring class derives a fresh deterministic key");
 		expect(augmentation).toContain("join category and normalized summary as `<category>|<summary>`");
 		expect(augmentation).toContain("embed and search for it verbatim in the prevention issue body");
@@ -240,7 +245,7 @@ describe("Wayfinder automation boundaries", () => {
 		expect(augmentation).toContain("Do not run it after review children");
 		expect(augmentation).toContain("any review child for that issue");
 		expect(augmentation).toContain("committed issue diff");
-		expect(augmentation).toContain("Classify each novel gate finding's `repeat` value under the unchanged finding-record rules");
+		expect(augmentation).toContain("Classify each novel gate finding's `repeat` value under the v2 finding-record rules");
 		expect(augmentation).toContain("Any novel AI-gate finding classified `repeat: \"earlier-issue\"` enters exactly the same recurring-class machinery as a review-child finding");
 		expect(augmentation).toContain("assign its recurring class and key under **Recurring-class identity**");
 		expect(augmentation).toContain("inject the pitfall note into all remaining implementation and fix-child contracts");
@@ -267,20 +272,23 @@ describe("Wayfinder automation boundaries", () => {
 		expect(review).not.toContain("exactly once for that issue");
 	}));
 
-	test("new verdict-only PASS records include source and omit every finding field", () => {
+	test("v2 verdict-only PASS records include run identity and worker provenance but omit finding fields", () => {
 		const augmentation = readFileSync(path.join(import.meta.dir, "augmentations", "auto.md"), "utf8");
-		const passSection = augmentation.split("## Verdict-only PASS record")[1] ?? "";
+		const passSection = augmentation.split("## V2 verdict-only PASS record")[1] ?? "";
 		const example = passSection.match(/```json\n(.+)\n```/)?.[1];
 
-		expect(passSection).toContain("only `date`, `issue`, `cycle`, `verdict`, and `source`");
-		expect(passSection).toContain("`workerSkillPack`");
+		expect(passSection).toContain("`workerSkillPack` is required");
+		expect(passSection).toContain("finding-only and repeat-provenance fields are omitted");
 		expect(example).toBeDefined();
 		expect(JSON.parse(example ?? "{}")).toEqual({
+			schemaVersion: 2,
 			date: "2026-02-24T16:40:00.000Z",
 			issue: 42,
 			cycle: "fix-2",
 			verdict: "PASS",
 			source: "review-child",
+			runId: "62bef605-bd95-49a4-aec3-d70e01bb3d8a",
+			workerSkillPack: ["implement", "tdd"],
 		});
 	});
 });
@@ -305,6 +313,9 @@ describe("retro phase contract", () => {
 		expect(prompt).toContain("target-repo deterministic toolchain checks");
 		expect(prompt).toContain("explicit per-proposal approval");
 		const augmentation = readFileSync(path.join(import.meta.dir, "augmentations", "retro.md"), "utf8");
+		expect(augmentation).toContain("Accept both unversioned legacy records and `schemaVersion: 2` records");
+		expect(augmentation).toContain("including mixed ledgers");
+		expect(augmentation).toContain("Validate finding UUID uniqueness across the ledger");
 		expect(augmentation).toContain("Give cross-issue clusters explicit priority");
 		expect(augmentation).toContain("Prevention tier for every across-issue proposal");
 		expect(augmentation).toContain("deterministic target-repo check, target-repo guidance, or routed skill");

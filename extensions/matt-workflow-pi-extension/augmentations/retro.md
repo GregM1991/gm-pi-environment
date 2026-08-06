@@ -4,9 +4,9 @@ Analysis and proposal format for `/matt-retro`, layered on top of the review led
 
 ## Validation gate
 
-Read `.pi/matt-review-ledger.jsonl` line by line before analysis. A valid line is one JSON object matching one of the two record shapes documented in `auto.md`: a finding record or a verdict-only PASS record. Validate required fields, cycle/verdict/source/category/repeat closed values, `file:line` locations, and the omission of finding-only fields from verdict-only records.
+Read `.pi/matt-review-ledger.jsonl` line by line before analysis. Accept both unversioned legacy records and `schemaVersion: 2` records documented in `auto.md`, including mixed ledgers. Treat source-less legacy records as `review-child`; legacy severity remains any non-empty string and otherwise validates exactly as before. Do not edit old lines to add a source or version. Reject any other present schema version.
 
-Accept mixed ledgers. Treat source-less legacy records as `review-child`; a present `source` must be exactly `review-child` or `ai-gate`. Do not edit old lines to add the defaulted source.
+For each v2 record, validate the required run UUID and worker skill pack, the finding/PASS shape, source-specific severity vocabulary, and all existing date/issue/cycle/source/category/location fields. Validate finding UUID uniqueness across the ledger. Validate that repeat provenance resolves to a strictly earlier compatible finding: v2 UUID through `repeatsFindingId` or unversioned JSONL line through `repeatsLegacyLine`; `earlier-issue` also requires `recurringClassKey`, while `none` omits every repeat-reference field. Validate each run as exactly one verdict-only PASS or one-or-more `FIX`/`BLOCKER` findings with consistent issue, cycle, source, and worker skill pack metadata. Reject run-ID reuse across incompatible issue/cycle/source metadata.
 
 If the file is missing, contains no non-whitespace lines, or any line is malformed, stop. Report a missing or empty file plainly. For malformed content, report every invalid line number and a concise reason; do not analyze the valid subset.
 
