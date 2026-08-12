@@ -86,6 +86,26 @@ _Avoid_: issue review history, issue-cycle-source tuple
 One actionable observation emitted by a Review Run and recorded independently in the Review Ledger.
 _Avoid_: review result, recurring class
 
+**Review Publication**:
+A GitHub-native representation of a Review Run or Review Finding, such as a PR review, inline comment, check run, or annotation. Publication says where evidence was delivered; `source` continues to say which review producer created it.
+_Avoid_: review source, finding producer, CI observation
+
+**CI Observation**:
+A check-run, commit-status, or required-policy result observed for a PR head and carried in normalized review packets or handoff evidence. It is not automatically a Review Run or Review Finding.
+_Avoid_: ledger finding, review source, publication
+
+**Subject SHA**:
+The full code commit evaluated by a Review Run or Recap Event, distinct from any later evidence-only commit that publishes the ledger.
+_Avoid_: evidence head, ledger commit
+
+**Review Run Summary**:
+The single denominator-bearing ledger record for one Review Run. It records the run verdict and identities of novel findings while keeping publication and recap evidence outside pass-rate accounting.
+_Avoid_: finding record, publication event, check result
+
+**Recap Event**:
+One informational ledger record proposing the impact class and displayed risk for a PR's final Subject SHA, with the affected recap primitives and invariants. It is not a review verdict or finding.
+_Avoid_: PASS record, risk override, review finding
+
 **Finding Antecedent**:
 The earlier Review Finding cited as direct evidence that a later finding repeats.
 _Avoid_: recurring-class key, repeat classification
