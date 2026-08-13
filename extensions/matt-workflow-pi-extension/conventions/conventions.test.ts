@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { buildConventionsContext, scaffoldConventionsJson } from "./config";
+import { buildConventionsContext, resolveRequiredCheckPolicy, scaffoldConventionsJson } from "./config";
 import { docsHint, toolchainHint, trackerHint } from "./hints";
 
 let repoRoot = "";
@@ -49,9 +49,11 @@ describe("repo conventions config", () => {
 		expect(buildConventionsContext(repoRoot).validation.diagnostics.map((item) => item.code)).toContain("invalid-json");
 		write("docs/agents/triage-labels.md");
 		write("docs/agents/workflow.md");
-		writeConfig({ version: 2, extra: true, tracker: { type: "linear", labelsDocPath: "docs/agents/triage-labels.md", extra: true }, toolchain: { runtime: "bun", extra: true, commands: { test: "bun test", lint: "bun lint" } }, docs: { workflowDocPath: "docs/agents/workflow.md", extra: true } });
-		const codes = buildConventionsContext(repoRoot).validation.diagnostics.map((item) => item.code);
+		writeConfig({ version: 3, extra: true, tracker: { type: "linear", labelsDocPath: "docs/agents/triage-labels.md", extra: true }, toolchain: { runtime: "bun", extra: true, commands: { test: "bun test", lint: "bun lint" } }, docs: { workflowDocPath: "docs/agents/workflow.md", extra: true } });
+		let codes = buildConventionsContext(repoRoot).validation.diagnostics.map((item) => item.code);
 		expect(codes).toContain("invalid-version");
+		writeConfig({ version: 2, extra: true, tracker: { type: "linear", labelsDocPath: "docs/agents/triage-labels.md", extra: true }, toolchain: { runtime: "bun", extra: true, commands: { test: "bun test", lint: "bun lint" } }, docs: { workflowDocPath: "docs/agents/workflow.md", extra: true } });
+		codes = buildConventionsContext(repoRoot).validation.diagnostics.map((item) => item.code);
 		expect(codes).toContain("invalid-tracker-type");
 		expect(codes.filter((code) => code === "unknown-config-field").length).toBeGreaterThanOrEqual(5);
 	});
@@ -74,6 +76,88 @@ describe("repo conventions config", () => {
 		expect(docsHint(context, repoRoot)).toBe("No expanded repo-local workflow doc was detected; rely on the phase engineering-skill references below.");
 	});
 
+	test("loads version 2 beside version 1 without changing section fallbacks", () => {
+		write("docs/custom-labels.md");
+		write("docs/architecture/recap-primitives.yaml", "version: 1\n");
+		write("bun.lock", "");
+		writeConfig({
+			version: 2,
+			tracker: {
+				type: "github-issues",
+				labelsDocPath: "docs/custom-labels.md",
+				requiredChecks: ["Fallow Audit / fallow-audit", "matt/ai-gate"],
+			},
+			architecture: { recapPrimitivesPath: "docs/architecture/recap-primitives.yaml" },
+		});
+
+		const context = buildConventionsContext(repoRoot);
+		expect(context.validation.ok).toBe(true);
+		expect(context.config).toEqual({
+			version: 2,
+			tracker: {
+				type: "github-issues",
+				labelsDocPath: "docs/custom-labels.md",
+				requiredChecks: ["Fallow Audit / fallow-audit", "matt/ai-gate"],
+			},
+			architecture: { recapPrimitivesPath: "docs/architecture/recap-primitives.yaml" },
+		});
+		expect(trackerHint(context, repoRoot)).toContain("docs/custom-labels.md");
+		expect(toolchainHint(context, repoRoot)).toBe("This repo is Bun-first. Use Bun commands from `AGENTS.md`.");
+		expect(docsHint(context, repoRoot)).toBe("No expanded repo-local workflow doc was detected; rely on the phase engineering-skill references below.");
+	});
+
+	test("rejects malformed version 2 delivery policy and recap references", () => {
+		write("docs/labels.md");
+		writeConfig({
+			version: 2,
+			tracker: {
+				type: "github-issues",
+				labelsDocPath: "docs/labels.md",
+				requiredChecks: ["check-a", " ", "check-a"],
+			},
+			architecture: {
+				recapPrimitivesPath: "../recap-primitives.yaml",
+				extra: true,
+			},
+		});
+
+		const diagnostics = buildConventionsContext(repoRoot).validation.diagnostics;
+		expect(diagnostics).toContainEqual(expect.objectContaining({ code: "invalid-required-check", path: "tracker.requiredChecks[1]" }));
+		expect(diagnostics).toContainEqual(expect.objectContaining({ code: "duplicate-required-check", path: "tracker.requiredChecks[2]" }));
+		expect(diagnostics).toContainEqual(expect.objectContaining({ code: "invalid-doc-path", path: "architecture.recapPrimitivesPath" }));
+		expect(diagnostics).toContainEqual(expect.objectContaining({ code: "unknown-config-field", path: "architecture.extra" }));
+
+		writeConfig({
+			version: 2,
+			tracker: { type: "github-issues", labelsDocPath: "docs/labels.md", requiredChecks: [] },
+			architecture: { recapPrimitivesPath: "docs/missing.yaml" },
+		});
+		const missingDiagnostics = buildConventionsContext(repoRoot).validation.diagnostics;
+		expect(missingDiagnostics).toContainEqual(expect.objectContaining({ code: "invalid-required-checks", path: "tracker.requiredChecks" }));
+		expect(missingDiagnostics).toContainEqual(expect.objectContaining({ code: "missing-doc", path: "architecture.recapPrimitivesPath" }));
+	});
+
+	test("version 2 requires explicit configured checks when tracker policy is present", () => {
+		write("docs/labels.md");
+		writeConfig({ version: 2, tracker: { type: "github-issues", labelsDocPath: "docs/labels.md" } });
+		expect(buildConventionsContext(repoRoot).validation.diagnostics).toContainEqual(
+			expect.objectContaining({ code: "invalid-required-checks", path: "tracker.requiredChecks" }),
+		);
+	});
+
+	test("version 1 rejects version 2 fields instead of partially accepting them", () => {
+		write("docs/labels.md");
+		write("docs/recap.yaml");
+		writeConfig({
+			version: 1,
+			tracker: { type: "github-issues", labelsDocPath: "docs/labels.md", requiredChecks: ["check-a"] },
+			architecture: { recapPrimitivesPath: "docs/recap.yaml" },
+		});
+		const diagnostics = buildConventionsContext(repoRoot).validation.diagnostics;
+		expect(diagnostics).toContainEqual(expect.objectContaining({ code: "unknown-config-field", path: "tracker.requiredChecks" }));
+		expect(diagnostics).toContainEqual(expect.objectContaining({ code: "unknown-config-field", path: "architecture" }));
+	});
+
 	test("accepts aiGate as an optional configured command", () => {
 		writeConfig({ version: 1, toolchain: { runtime: "bun", commands: { test: "bun test", aiGate: "bun run ai-gate --base main --head HEAD" } } });
 		const context = buildConventionsContext(repoRoot);
@@ -86,6 +170,37 @@ describe("repo conventions config", () => {
 		writeConfig({ version: 1, toolchain: { runtime: "bun", commands: { aiGate: "   " } } });
 		const diagnostics = buildConventionsContext(repoRoot).validation.diagnostics;
 		expect(diagnostics).toContainEqual(expect.objectContaining({ code: "invalid-command", path: "toolchain.commands.aiGate" }));
+	});
+
+	test("resolves native required checks before configured fallback and otherwise hard-stops", () => {
+		write("docs/labels.md");
+		writeConfig({
+			version: 2,
+			tracker: {
+				type: "github-issues",
+				labelsDocPath: "docs/labels.md",
+				requiredChecks: ["configured/check"],
+			},
+		});
+		const configuredContext = buildConventionsContext(repoRoot);
+
+		expect(resolveRequiredCheckPolicy(configuredContext, ["native/check"])).toEqual({
+			status: "resolved",
+			source: "github",
+			requiredChecks: ["native/check"],
+		});
+		expect(resolveRequiredCheckPolicy(configuredContext)).toEqual({
+			status: "resolved",
+			source: "configured",
+			requiredChecks: ["configured/check"],
+		});
+
+		writeConfig({ version: 1, tracker: { type: "github-issues", labelsDocPath: "docs/labels.md" } });
+		expect(resolveRequiredCheckPolicy(buildConventionsContext(repoRoot))).toEqual({
+			status: "hard-stop",
+			reason: "missing-required-check-policy",
+			message: "Delivery requires native GitHub required-check policy or tracker.requiredChecks in repo conventions version 2.",
+		});
 	});
 
 	test("hint text uses configured docs, extras, runtime, and commands", () => {
