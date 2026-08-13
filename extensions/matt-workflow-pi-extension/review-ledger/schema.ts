@@ -12,6 +12,10 @@ export const REVIEW_LEDGER_CATEGORIES = [
 export const REVIEW_LEDGER_REPEATS = ["none", "earlier-cycle", "earlier-issue"] as const;
 export const REVIEW_CHILD_SEVERITIES = ["high", "medium", "low", "blocking"] as const;
 export const AI_GATE_SEVERITIES = ["must-fix", "should-fix", "non-remediable-blocker", "blocking"] as const;
+export const REVIEW_LEDGER_RECORD_TYPES = ["review-run", "finding", "publication", "recap"] as const;
+export const REVIEW_PUBLICATION_SURFACES = ["pr-review-summary", "pr-review-thread"] as const;
+export const REVIEW_RECAP_IMPACT_CLASSES = ["composes", "extends", "adds"] as const;
+export const REVIEW_RECAP_RISKS = ["low", "medium", "high"] as const;
 
 export type ReviewLedgerSource = typeof REVIEW_LEDGER_SOURCES[number];
 export type ReviewLedgerCycle = typeof REVIEW_LEDGER_CYCLES[number];
@@ -20,6 +24,10 @@ export type ReviewLedgerCategory = typeof REVIEW_LEDGER_CATEGORIES[number];
 export type ReviewLedgerRepeat = typeof REVIEW_LEDGER_REPEATS[number];
 export type ReviewChildSeverity = typeof REVIEW_CHILD_SEVERITIES[number];
 export type AiGateSeverity = typeof AI_GATE_SEVERITIES[number];
+export type ReviewLedgerRecordType = typeof REVIEW_LEDGER_RECORD_TYPES[number];
+export type ReviewPublicationSurface = typeof REVIEW_PUBLICATION_SURFACES[number];
+export type ReviewRecapImpactClass = typeof REVIEW_RECAP_IMPACT_CLASSES[number];
+export type ReviewRecapRisk = typeof REVIEW_RECAP_RISKS[number];
 
 export type ReviewLedgerLegacyPassRecord = {
 	date: string;
@@ -76,9 +84,66 @@ export type ReviewLedgerV2FindingRecord = {
 	recurringClassKey?: string;
 };
 
+export type ReviewLedgerTaggedRunRecord = {
+	schemaVersion: 2;
+	recordType: "review-run";
+	date: string;
+	issue: number;
+	pullRequest: number;
+	cycle: ReviewLedgerCycle;
+	source: ReviewLedgerSource;
+	runId: string;
+	workerSkillPack: string[];
+	subjectSha: string;
+	verdict: ReviewLedgerVerdict;
+	findingIds: string[];
+	suppressedDuplicateCount: number;
+};
+
+export type ReviewLedgerTaggedFindingRecord = ReviewLedgerV2FindingRecord & {
+	recordType: "finding";
+	pullRequest: number;
+	subjectSha: string;
+};
+
+export type ReviewLedgerPublicationRecord = {
+	schemaVersion: 2;
+	recordType: "publication";
+	date: string;
+	publicationId: string;
+	issue: number;
+	pullRequest: number;
+	subjectSha: string;
+	source: "review-child";
+	runId: string;
+	findingId?: string;
+	provider: "github";
+	surface: ReviewPublicationSurface;
+	externalKey: string;
+	url?: string;
+};
+
+export type ReviewLedgerRecapRecord = {
+	schemaVersion: 2;
+	recordType: "recap";
+	date: string;
+	recapId: string;
+	issue: number;
+	pullRequest: number;
+	subjectSha: string;
+	source: "review-child";
+	runId: string;
+	impactClass: ReviewRecapImpactClass;
+	displayedRisk: ReviewRecapRisk;
+	touchedRecapPrimitiveIds: string[];
+	removedRecapPrimitiveIds: string[];
+	touchedInvariantIds: string[];
+};
+
 export type ReviewLedgerPassRecord = ReviewLedgerLegacyPassRecord | ReviewLedgerV2PassRecord;
-export type ReviewLedgerFindingRecord = ReviewLedgerLegacyFindingRecord | ReviewLedgerV2FindingRecord;
-export type ReviewLedgerRecord = ReviewLedgerPassRecord | ReviewLedgerFindingRecord;
+export type ReviewLedgerFindingRecord = ReviewLedgerLegacyFindingRecord | ReviewLedgerV2FindingRecord | ReviewLedgerTaggedFindingRecord;
+export type ReviewLedgerTaggedRecord = ReviewLedgerTaggedRunRecord | ReviewLedgerTaggedFindingRecord | ReviewLedgerPublicationRecord | ReviewLedgerRecapRecord;
+export type ReviewLedgerRecord = ReviewLedgerPassRecord | ReviewLedgerFindingRecord | ReviewLedgerTaggedRecord;
 export type ReviewLedgerValidation = { ok: true; record: ReviewLedgerRecord } | { ok: false; reason: string };
 export type ReviewLedgerParseResult = { ok: true; records: ReviewLedgerRecord[] } | { ok: false; errors: Array<{ line: number; reason: string }> };
 
@@ -100,6 +165,11 @@ const V2_FINDING_FIELDS = [
 ] as const;
 const V2_ALL_FIELDS = new Set([...V2_COMMON_FIELDS, ...V2_FINDING_FIELDS]);
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const FULL_GIT_SHA = /^[0-9a-f]{40}$/;
+const TAGGED_RUN_FIELDS = new Set(["schemaVersion", "recordType", "date", "issue", "pullRequest", "cycle", "source", "runId", "workerSkillPack", "subjectSha", "verdict", "findingIds", "suppressedDuplicateCount"]);
+const TAGGED_FINDING_FIELDS = new Set([...V2_ALL_FIELDS, "recordType", "pullRequest", "subjectSha"]);
+const PUBLICATION_FIELDS = new Set(["schemaVersion", "recordType", "date", "publicationId", "issue", "pullRequest", "subjectSha", "source", "runId", "findingId", "provider", "surface", "externalKey", "url"]);
+const RECAP_FIELDS = new Set(["schemaVersion", "recordType", "date", "recapId", "issue", "pullRequest", "subjectSha", "source", "runId", "impactClass", "displayedRisk", "touchedRecapPrimitiveIds", "removedRecapPrimitiveIds", "touchedInvariantIds"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -339,17 +409,150 @@ function validateV2Record(value: Record<string, unknown>): ReviewLedgerValidatio
 	};
 }
 
+function validateKnownFields(value: Record<string, unknown>, fields: ReadonlySet<string>): ReviewLedgerValidation | undefined {
+	for (const key of Object.keys(value)) if (!fields.has(key)) return invalid(`unknown field: ${key}`);
+	return undefined;
+}
+
+function validateTaggedIdentity(value: Record<string, unknown>): ReviewLedgerValidation | undefined {
+	if (!validUtcDate(value.date)) return invalid("date must be an ISO 8601 UTC timestamp");
+	if (!Number.isInteger(value.issue) || Number(value.issue) <= 0) return invalid("issue must be a positive integer");
+	if (!Number.isInteger(value.pullRequest) || Number(value.pullRequest) <= 0) return invalid("pullRequest must be a positive integer");
+	if (!validUuidV4(value.runId)) return invalid("runId must be a canonical lowercase UUIDv4");
+	if (typeof value.subjectSha !== "string" || !FULL_GIT_SHA.test(value.subjectSha)) return invalid("subjectSha must be a full lowercase Git SHA");
+	return undefined;
+}
+
+function uniqueUuidList(value: unknown): value is string[] {
+	return Array.isArray(value) && value.every(validUuidV4) && new Set(value).size === value.length;
+}
+
+function sortedUniqueStrings(value: unknown): value is string[] {
+	return Array.isArray(value)
+		&& value.every(nonEmptyString)
+		&& new Set(value).size === value.length
+		&& value.every((entry, index) => index === 0 || value[index - 1].localeCompare(entry) < 0);
+}
+
+function validateTaggedRun(value: Record<string, unknown>): ReviewLedgerValidation {
+	const fieldError = validateKnownFields(value, TAGGED_RUN_FIELDS);
+	if (fieldError) return fieldError;
+	const identityError = validateTaggedIdentity(value);
+	if (identityError) return identityError;
+	if (!isClosedValue(REVIEW_LEDGER_CYCLES, value.cycle)) return invalid("cycle must be initial, fix-1, fix-2, or fix-3");
+	if (!isClosedValue(REVIEW_LEDGER_SOURCES, value.source)) return invalid("source is required on tagged review-run records");
+	if (!nonEmptySkillPack(value.workerSkillPack)) return invalid("workerSkillPack must be a non-empty array of skill IDs");
+	if (!isClosedValue(REVIEW_LEDGER_VERDICTS, value.verdict)) return invalid("verdict must be PASS, FIX, or BLOCKER");
+	if (!uniqueUuidList(value.findingIds)) return invalid("findingIds must be a duplicate-free array of canonical lowercase UUIDv4 values");
+	if (!Number.isInteger(value.suppressedDuplicateCount) || Number(value.suppressedDuplicateCount) < 0) {
+		return invalid("suppressedDuplicateCount must be a non-negative integer");
+	}
+	if (value.verdict === "PASS" && ((value.findingIds as string[]).length > 0 || value.suppressedDuplicateCount !== 0)) {
+		return invalid("PASS review-run requires no findings and zero suppressed duplicates");
+	}
+	if (value.verdict !== "PASS" && (value.findingIds as string[]).length === 0 && value.suppressedDuplicateCount === 0) {
+		return invalid("FIX or BLOCKER review-run requires findings or suppressed duplicates");
+	}
+	return { ok: true, record: { ...value, workerSkillPack: [...value.workerSkillPack as string[]], findingIds: [...value.findingIds as string[]] } as ReviewLedgerTaggedRunRecord };
+}
+
+function validateTaggedFinding(value: Record<string, unknown>): ReviewLedgerValidation {
+	const fieldError = validateKnownFields(value, TAGGED_FINDING_FIELDS);
+	if (fieldError) return fieldError;
+	const identityError = validateTaggedIdentity(value);
+	if (identityError) return identityError;
+	const { recordType: _recordType, pullRequest: _pullRequest, subjectSha: _subjectSha, ...untagged } = value;
+	const validation = validateV2Record(untagged);
+	if (!validation.ok) return validation;
+	if (!("findingId" in validation.record)) return invalid("tagged finding must use the finding record shape");
+	return {
+		ok: true,
+		record: {
+			...validation.record,
+			recordType: "finding",
+			pullRequest: value.pullRequest as number,
+			subjectSha: value.subjectSha as string,
+		},
+	};
+}
+
+function validAbsoluteUrl(value: unknown): value is string {
+	if (typeof value !== "string") return false;
+	try {
+		const parsed = new URL(value);
+		return parsed.protocol === "https:" || parsed.protocol === "http:";
+	} catch {
+		return false;
+	}
+}
+
+function validatePublication(value: Record<string, unknown>): ReviewLedgerValidation {
+	const fieldError = validateKnownFields(value, PUBLICATION_FIELDS);
+	if (fieldError) return fieldError;
+	const identityError = validateTaggedIdentity(value);
+	if (identityError) return identityError;
+	if (!validUuidV4(value.publicationId)) return invalid("publicationId must be a canonical lowercase UUIDv4");
+	if (value.source !== "review-child") return invalid("publication source must be review-child");
+	if (value.provider !== "github") return invalid("publication provider must be github");
+	if (!isClosedValue(REVIEW_PUBLICATION_SURFACES, value.surface)) return invalid("publication surface must be pr-review-summary or pr-review-thread");
+	if (!nonEmptyString(value.externalKey)) return invalid("externalKey must be a non-empty string");
+	if (value.url !== undefined && !validAbsoluteUrl(value.url)) return invalid("url must be an absolute HTTP(S) URL when present");
+	if (value.surface === "pr-review-summary" && value.findingId !== undefined) return invalid("pr-review-summary publication must omit findingId");
+	if (value.surface === "pr-review-thread" && !validUuidV4(value.findingId)) return invalid("pr-review-thread publication requires a canonical findingId");
+	return { ok: true, record: { ...value, externalKey: (value.externalKey as string).trim() } as ReviewLedgerPublicationRecord };
+}
+
+function validateRecap(value: Record<string, unknown>): ReviewLedgerValidation {
+	const fieldError = validateKnownFields(value, RECAP_FIELDS);
+	if (fieldError) return fieldError;
+	const identityError = validateTaggedIdentity(value);
+	if (identityError) return identityError;
+	if (!validUuidV4(value.recapId)) return invalid("recapId must be a canonical lowercase UUIDv4");
+	if (value.source !== "review-child") return invalid("recap source must be review-child");
+	if (!isClosedValue(REVIEW_RECAP_IMPACT_CLASSES, value.impactClass)) return invalid("impactClass must be composes, extends, or adds");
+	if (!isClosedValue(REVIEW_RECAP_RISKS, value.displayedRisk)) return invalid("displayedRisk must be low, medium, or high");
+	for (const field of ["touchedRecapPrimitiveIds", "removedRecapPrimitiveIds", "touchedInvariantIds"] as const) {
+		if (!sortedUniqueStrings(value[field])) return invalid(`${field} must be sorted and unique`);
+	}
+	const touched = value.touchedRecapPrimitiveIds as string[];
+	const removed = value.removedRecapPrimitiveIds as string[];
+	if (removed.some((id) => touched.includes(id))) return invalid("removedRecapPrimitiveIds must be separate from touchedRecapPrimitiveIds");
+	if (removed.length > 0 && value.displayedRisk !== "high") return invalid("recap with removed primitives must use displayedRisk high");
+	const expectedRisk = { composes: "low", extends: "medium", adds: "high" }[value.impactClass as ReviewRecapImpactClass];
+	if (removed.length === 0 && value.displayedRisk !== expectedRisk) return invalid(`${value.impactClass as string} recap must use displayedRisk ${expectedRisk}`);
+	return {
+		ok: true,
+		record: {
+			...value,
+			touchedRecapPrimitiveIds: [...touched],
+			removedRecapPrimitiveIds: [...removed],
+			touchedInvariantIds: [...value.touchedInvariantIds as string[]],
+		} as ReviewLedgerRecapRecord,
+	};
+}
+
 export function validateReviewLedgerRecord(value: unknown): ReviewLedgerValidation {
 	if (!isRecord(value)) return invalid("record must be a JSON object");
 	if ("schemaVersion" in value) {
 		if (value.schemaVersion !== 2) return invalid("schemaVersion must be 2 when present");
+		if ("recordType" in value) {
+			if (!isClosedValue(REVIEW_LEDGER_RECORD_TYPES, value.recordType)) return invalid("recordType must be review-run, finding, publication, or recap");
+			if (value.recordType === "review-run") return validateTaggedRun(value);
+			if (value.recordType === "finding") return validateTaggedFinding(value);
+			if (value.recordType === "publication") return validatePublication(value);
+			return validateRecap(value);
+		}
 		return validateV2Record(value);
 	}
 	return validateLegacyRecord(value);
 }
 
-function isV2Record(record: ReviewLedgerRecord): record is ReviewLedgerV2PassRecord | ReviewLedgerV2FindingRecord {
-	return "schemaVersion" in record;
+function isUntaggedV2Record(record: ReviewLedgerRecord): record is ReviewLedgerV2PassRecord | ReviewLedgerV2FindingRecord {
+	return "schemaVersion" in record && !("recordType" in record);
+}
+
+function isTaggedRecord(record: ReviewLedgerRecord): record is ReviewLedgerTaggedRecord {
+	return "recordType" in record;
 }
 
 function isFindingRecord(record: ReviewLedgerRecord): record is ReviewLedgerFindingRecord {
@@ -408,15 +611,42 @@ export function parseReviewLedger(contents: string): ReviewLedgerParseResult {
 		}
 	}
 
-	const findingsById = new Map<string, { line: number; record: ReviewLedgerV2FindingRecord }>();
+	const findingsById = new Map<string, { line: number; record: ReviewLedgerV2FindingRecord | ReviewLedgerTaggedFindingRecord }>();
 	const entriesByLine = new Map(entries.map((entry) => [entry.line, entry]));
 	const runs = new Map<string, { line: number; record: ReviewLedgerV2PassRecord | ReviewLedgerV2FindingRecord; kind: "pass" | "findings"; count: number }>();
+	type TaggedRunState = { line: number; record: ReviewLedgerTaggedRunRecord; findings: ReviewLedgerTaggedFindingRecord[]; published: boolean; recapped: boolean };
+	const taggedRuns = new Map<string, TaggedRunState>();
+	let activeTaggedRun: TaggedRunState | undefined;
+	const eventUuids = new Map<string, { line: number; kind: "findingId" | "publicationId" | "recapId" }>();
+	const externalKeys = new Map<string, number>();
+	const recapCadences = new Map<string, number>();
+
+	const recordEventUuid = (uuid: string, kind: "findingId" | "publicationId" | "recapId", line: number): void => {
+		const existing = eventUuids.get(uuid);
+		if (!existing) {
+			eventUuids.set(uuid, { line, kind });
+			return;
+		}
+		if (existing.kind !== kind) {
+			errors.push({ line, reason: `${kind} reuses event UUID ${uuid} already used as ${existing.kind} on line ${existing.line}` });
+		} else if (kind !== "findingId") {
+			errors.push({ line, reason: `duplicate ${kind}: ${uuid}` });
+		}
+	};
 
 	for (const entry of entries) {
-		if (!isV2Record(entry.record)) continue;
 		const record = entry.record;
+		if (!isTaggedRecord(record)) {
+			if (activeTaggedRun && activeTaggedRun.findings.length !== activeTaggedRun.record.findingIds.length) {
+				errors.push({ line: entry.line, reason: `record cannot interrupt tagged review-run ${activeTaggedRun.record.runId} before all declared findings` });
+			}
+			activeTaggedRun = undefined;
+		}
+		if (!("schemaVersion" in record)) continue;
+
 		if (isFindingRecord(record)) {
 			if (findingsById.has(record.findingId)) errors.push({ line: entry.line, reason: `duplicate findingId: ${record.findingId}` });
+			recordEventUuid(record.findingId, "findingId", entry.line);
 
 			let antecedent: ReviewLedgerFindingRecord | undefined;
 			if (record.repeatsFindingId !== undefined) {
@@ -424,7 +654,7 @@ export function parseReviewLedger(contents: string): ReviewLedgerParseResult {
 				if (!antecedent) errors.push({ line: entry.line, reason: "repeatsFindingId must resolve to a strictly earlier v2 finding" });
 			} else if (record.repeatsLegacyLine !== undefined) {
 				const target = entriesByLine.get(record.repeatsLegacyLine);
-				if (!target || target.line >= entry.line || isV2Record(target.record) || !isFindingRecord(target.record)) {
+				if (!target || target.line >= entry.line || "schemaVersion" in target.record || !isFindingRecord(target.record)) {
 					errors.push({ line: entry.line, reason: "repeatsLegacyLine must resolve to a strictly earlier unversioned finding" });
 				} else antecedent = target.record;
 			}
@@ -435,26 +665,103 @@ export function parseReviewLedger(contents: string): ReviewLedgerParseResult {
 			if (!findingsById.has(record.findingId)) findingsById.set(record.findingId, { line: entry.line, record });
 		}
 
-		const existingRun = runs.get(record.runId);
-		const kind = isFindingRecord(record) ? "findings" : "pass";
-		if (!existingRun) {
-			runs.set(record.runId, { line: entry.line, record, kind, count: 1 });
+		if (isUntaggedV2Record(record)) {
+			const existingRun = runs.get(record.runId);
+			const kind = isFindingRecord(record) ? "findings" : "pass";
+			if (!existingRun) {
+				if (taggedRuns.has(record.runId)) errors.push({ line: entry.line, reason: `runId ${record.runId} is already used by a tagged review-run` });
+				runs.set(record.runId, { line: entry.line, record, kind, count: 1 });
+				continue;
+			}
+			if (
+				existingRun.record.issue !== record.issue
+				|| existingRun.record.cycle !== record.cycle
+				|| existingRun.record.source !== record.source
+				|| !sameSkillPack(existingRun.record.workerSkillPack, record.workerSkillPack)
+			) errors.push({ line: entry.line, reason: `runId ${record.runId} has incompatible issue, cycle, source, or workerSkillPack metadata` });
+			if (existingRun.kind !== kind) errors.push({ line: entry.line, reason: `runId ${record.runId} cannot mix PASS with findings` });
+			else if (kind === "pass") errors.push({ line: entry.line, reason: `runId ${record.runId} must contain exactly one verdict-only PASS` });
+			existingRun.count += 1;
 			continue;
 		}
-		if (
-			existingRun.record.issue !== record.issue
-			|| existingRun.record.cycle !== record.cycle
-			|| existingRun.record.source !== record.source
-			|| !sameSkillPack(existingRun.record.workerSkillPack, record.workerSkillPack)
-		) {
-			errors.push({ line: entry.line, reason: `runId ${record.runId} has incompatible issue, cycle, source, or workerSkillPack metadata` });
+
+		if (!isTaggedRecord(record)) continue;
+		if (record.recordType === "review-run") {
+			if (activeTaggedRun && activeTaggedRun.findings.length !== activeTaggedRun.record.findingIds.length) {
+				errors.push({
+					line: entry.line,
+					reason: `tagged review-run ${record.runId} cannot begin before review-run ${activeTaggedRun.record.runId} has all declared findings`,
+				});
+			}
+			if (taggedRuns.has(record.runId) || runs.has(record.runId)) {
+				errors.push({ line: entry.line, reason: `duplicate review runId: ${record.runId}` });
+				activeTaggedRun = undefined;
+			} else {
+				activeTaggedRun = { line: entry.line, record, findings: [], published: false, recapped: false };
+				taggedRuns.set(record.runId, activeTaggedRun);
+			}
+			continue;
 		}
-		if (existingRun.kind !== kind) {
-			errors.push({ line: entry.line, reason: `runId ${record.runId} cannot mix PASS with findings` });
-		} else if (kind === "pass") {
-			errors.push({ line: entry.line, reason: `runId ${record.runId} must contain exactly one verdict-only PASS` });
+		const run = taggedRuns.get(record.runId);
+		if (run && activeTaggedRun !== run) {
+			errors.push({ line: entry.line, reason: `tagged ${record.recordType} must be contiguous with its review-run batch` });
 		}
-		existingRun.count += 1;
+		if (record.recordType === "finding") {
+			if (!run) {
+				errors.push({ line: entry.line, reason: "tagged finding runId must resolve to a strictly earlier tagged review-run" });
+				continue;
+			}
+			if (run.published || run.recapped) errors.push({ line: entry.line, reason: "tagged findings must precede publications and recap for their review-run" });
+			if (
+				run.record.issue !== record.issue || run.record.pullRequest !== record.pullRequest
+				|| run.record.cycle !== record.cycle || run.record.source !== record.source
+				|| run.record.subjectSha !== record.subjectSha || !sameSkillPack(run.record.workerSkillPack, record.workerSkillPack)
+			) errors.push({ line: entry.line, reason: `finding ${record.findingId} must match its review-run metadata` });
+			run.findings.push(record);
+			continue;
+		}
+		if (record.recordType === "publication") {
+			recordEventUuid(record.publicationId, "publicationId", entry.line);
+			if (externalKeys.has(record.externalKey)) errors.push({ line: entry.line, reason: `duplicate publication externalKey: ${record.externalKey}` });
+			else externalKeys.set(record.externalKey, entry.line);
+			if (!run) errors.push({ line: entry.line, reason: "publication runId must resolve to a strictly earlier tagged review-run" });
+			else if (run.recapped) errors.push({ line: entry.line, reason: "publication must precede recap for its review-run" });
+			else if (run.findings.length !== run.record.findingIds.length) errors.push({ line: entry.line, reason: "publication must follow all findings declared by its review-run" });
+			else if (run.record.issue !== record.issue || run.record.pullRequest !== record.pullRequest || run.record.source !== record.source || run.record.subjectSha !== record.subjectSha) {
+				errors.push({ line: entry.line, reason: "publication must match its review-run identity" });
+			}
+			if (run) run.published = true;
+			if (run && record.findingId !== undefined) {
+				const finding = findingsById.get(record.findingId);
+				if (!finding || !("recordType" in finding.record) || finding.record.runId !== record.runId) {
+					errors.push({ line: entry.line, reason: "publication findingId must resolve to a strictly earlier finding in its review-run" });
+				}
+			}
+			continue;
+		}
+		recordEventUuid(record.recapId, "recapId", entry.line);
+		const cadenceKey = `${record.issue}:${record.pullRequest}:${record.subjectSha}`;
+		if (recapCadences.has(cadenceKey)) errors.push({ line: entry.line, reason: `recap already recorded for issue ${record.issue}, pull request ${record.pullRequest}, and Subject SHA ${record.subjectSha}` });
+		else recapCadences.set(cadenceKey, entry.line);
+		if (!run) errors.push({ line: entry.line, reason: "recap runId must resolve to a strictly earlier tagged review-run" });
+		else if (run.findings.length !== run.record.findingIds.length) errors.push({ line: entry.line, reason: "recap must follow all findings declared by its review-run" });
+		else if (run.record.issue !== record.issue || run.record.pullRequest !== record.pullRequest || run.record.subjectSha !== record.subjectSha || run.record.source !== "review-child") {
+			errors.push({ line: entry.line, reason: "recap must match its review-run issue, pullRequest, source, and subjectSha" });
+		}
+		if (run) run.recapped = true;
+	}
+
+	for (const { line, record, findings } of taggedRuns.values()) {
+		const observedIds = findings.map((finding) => finding.findingId);
+		if (record.findingIds.length !== observedIds.length || record.findingIds.some((id, index) => id !== observedIds[index])) {
+			errors.push({ line, reason: `review-run ${record.runId} findingIds must exactly match its following findings in order` });
+		}
+		if (findings.length > 0) {
+			const hasBlockingFinding = findings.some((finding) => finding.verdict === "BLOCKER");
+			const inconsistent = (hasBlockingFinding && record.verdict !== "BLOCKER")
+				|| (!hasBlockingFinding && record.verdict === "BLOCKER" && record.suppressedDuplicateCount === 0);
+			if (inconsistent) errors.push({ line, reason: `review-run ${record.runId} verdict must match observed findings before duplicate suppression` });
+		}
 	}
 
 	if (nonWhitespaceLines === 0) errors.push({ line: 0, reason: "ledger is empty" });

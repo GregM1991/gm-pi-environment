@@ -8,6 +8,8 @@ Append every new record through `(cd <extension-root> && bun run review-ledger:a
 
 The command validates the complete existing ledger plus the candidate record before appending. It rejects malformed or out-of-taxonomy records, incompatible run reuse including PASS mixed with findings, duplicate finding identities, invalid repeat provenance, and a second AI-gate run for the same issue. A rejection prints a specific reason and exits non-zero without appending. Treat any rejection as a hard stop: never work around it by writing, echoing, or editing a JSONL line directly.
 
+PR-era tagged records are appended atomically as a complete canonical batch through `--batch '<json-array>'`. Batch fields include their stable `runId`/event identities but omit `schemaVersion` and `date`, which the command stamps. The Interface writes nothing unless the whole batch and resulting mixed ledger validate. Canonical order is Review Run Summary, its Findings in `findingIds` order, confirmed Publications, then the final Recap after its referenced run. Do not submit a tagged record through one-record `--record`, because an incomplete tagged run is invalid by design.
+
 ## Per-issue review packet
 
 Before launching any implementation, fix, or review child for an issue, write a packet outside the worktree at `${TMPDIR:-/tmp}/matt-auto-review-packets/<repo-id>/<issue>.md`. Derive `<repo-id>` from the repository root identity: use the canonical `owner/name` from the normalized `origin` URL when available, otherwise the real absolute worktree path; UTF-8 encode that identity, base64url encode it without padding, and prefix it with `gh-` or `path-` respectively. This is collision-safe and contains only `[A-Za-z0-9_-]`. Create the packet root and repository directory with mode `0700` and each packet with mode `0600` (correct existing modes before use). Never stage or commit this temporary artifact, and exclude it explicitly from dirty-worktree stop handling. Delete the issue packet after successful issue closeout; on every loop termination path, delete all packets created by that run, remove the now-empty `<repo-id>` directory, and remove the packet root if it is empty.
@@ -36,6 +38,17 @@ Every newly appended record uses `schemaVersion: 2` and requires:
 - `workerSkillPack`: the non-empty skill-ID list active for the implementation or fix worker in this cycle
 
 Reject any present `schemaVersion` other than `2`. One v2 run is exactly one verdict-only PASS record or one-or-more finding records. Every record sharing a `runId` must share issue, cycle, source, and worker skill pack; never reuse a run ID for incompatible metadata.
+
+## Tagged v2 PR-era records
+
+Unversioned legacy and untagged v2 records above remain byte-compatible. New PR-era evidence uses `schemaVersion: 2` plus `recordType` and a full 40-character lowercase `subjectSha` naming the evaluated code commit, not a later ledger-only evidence head. `issue` and `pullRequest` are positive repository-local numbers; event identities are canonical lowercase UUIDv4 values.
+
+- `recordType: "review-run"` contains `date`, issue/PR/cycle/source/run/worker-pack/Subject-SHA identity, `verdict`, ordered distinct `findingIds`, and non-negative `suppressedDuplicateCount`. It is the sole tagged denominator: each run counts once for its source, and only `PASS` is a success. Verdict is the highest observed disposition before duplicate suppression. PASS requires no findings and no suppressed duplicates; FIX/BLOCKER requires a finding or a positive suppressed count.
+- `recordType: "finding"` contains the same run metadata plus the existing finding, severity, category, repeat, and antecedent fields. Its metadata must match the earlier Review Run, and the run's `findingIds` must exactly equal its following Findings in order.
+- `recordType: "publication"` is appended only after GitHub confirms creation. It contains `publicationId`, issue/PR/Subject-SHA/source/run identity, optional `findingId`, `provider: "github"`, opaque globally unique `externalKey`, optional absolute `url`, and either `pr-review-summary` without a finding or `pr-review-thread` with an earlier finding in that run. Publication is transport, not producer identity. AI-gate checks/annotations and external feedback remain GitHub evidence, not ledger Publications.
+- `recordType: "recap"` contains `recapId`, issue/PR/Subject-SHA, `source: "review-child"`, an earlier matching `runId`, impact/risk, and sorted unique touched/removed primitive and invariant IDs. Exactly one recap is allowed per issue/PR/Subject-SHA. Removed primitive IDs stay separate and force high risk; otherwise composes/extends/adds maps to low/medium/high. Recaps are informational and add no verdict or denominator.
+
+Finding UUID, Publication UUID/external-key, Recap UUID/cadence, run identity, Subject-SHA, source, ordering, and repeat antecedent failures are reported against their JSONL line. Findings, Publications, Recaps, CI observations, and final check results add no pass-rate denominator.
 
 ## V2 finding record
 

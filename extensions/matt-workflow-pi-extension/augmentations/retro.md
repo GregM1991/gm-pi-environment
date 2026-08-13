@@ -6,7 +6,9 @@ Analysis and proposal format for `/matt-retro`, layered on top of the review led
 
 Read `.pi/matt-review-ledger.jsonl` line by line before analysis. Accept both unversioned legacy records and `schemaVersion: 2` records documented in `auto.md`, including mixed ledgers. Treat source-less legacy records as `review-child`; legacy severity remains any non-empty string and otherwise validates exactly as before. Do not edit old lines to add a source or version. Reject any other present schema version.
 
-For each v2 record, validate the required run UUID and worker skill pack, the finding/PASS shape, source-specific severity vocabulary, and all existing date/issue/cycle/source/category/location fields. Validate finding UUID uniqueness across the ledger. Validate that repeat provenance resolves to a strictly earlier compatible finding: v2 UUID through `repeatsFindingId` or unversioned JSONL line through `repeatsLegacyLine`; `earlier-issue` also requires `recurringClassKey`, while `none` omits every repeat-reference field. Validate each run as exactly one verdict-only PASS or one-or-more `FIX`/`BLOCKER` findings with consistent issue, cycle, source, and worker skill pack metadata. Reject run-ID reuse across incompatible issue/cycle/source metadata.
+For each untagged v2 record, validate the required run UUID and worker skill pack, the finding/PASS shape, source-specific severity vocabulary, and all existing date/issue/cycle/source/category/location fields. Validate finding UUID uniqueness across the ledger. Validate that repeat provenance resolves to a strictly earlier compatible finding: v2 UUID through `repeatsFindingId` or unversioned JSONL line through `repeatsLegacyLine`; `earlier-issue` also requires `recurringClassKey`, while `none` omits every repeat-reference field. Validate each untagged run as exactly one verdict-only PASS or one-or-more `FIX`/`BLOCKER` findings with consistent issue, cycle, source, and worker skill pack metadata. Reject run-ID reuse across incompatible issue/cycle/source metadata.
+
+For tagged v2 history, validate Review Run, Finding, Publication, and Recap shapes plus globally unique event identities. Require full Subject SHAs and matching issue/PR/cycle/source/run/worker-pack relationships, strictly earlier run/finding/repeat antecedents, and canonical run → findings → publications → recap order. A Review Run's ordered `findingIds` must exactly match its Finding records, and its verdict must reflect the highest observed disposition before duplicate suppression. Enforce Publication source/surface/finding rules and Recap source, cadence, sorted identifiers, separated removals, and impact-to-risk mapping. Reject partial or contradictory tagged runs with line-numbered diagnostics.
 
 If the file is missing, contains no non-whitespace lines, or any line is malformed, stop. Report a missing or empty file plainly. For malformed content, report every invalid line number and a concise reason; do not analyze the valid subset.
 
@@ -19,8 +21,8 @@ Report review surfaces separately for `review-child` and `ai-gate`; never confla
 For each source, report:
 
 - finding count and category counts
-- distinct recorded review executions, keyed by issue plus cycle plus source
-- verdict-only PASS count and recorded pass rate (`PASS` executions divided by distinct recorded executions)
+- distinct recorded review executions: legacy/untagged history retains its existing issue/cycle/source accounting, while each tagged `review-run` is one explicit execution denominator
+- PASS execution count and recorded pass rate (`PASS` Review Runs or legacy/untagged PASS executions divided by the corresponding distinct recorded executions); tagged Findings, Publications, and Recaps never add denominators
 - issue/cycle references for findings and PASS records
 
 Call out `ai-gate` `verification-skipped`/`BLOCKER` records as gate reliability failures, not worker correctness findings. A cycle with only per-issue gate duplicates suppressed across review cycles has no AI-gate ledger record and is therefore outside the recorded pass-rate denominator; do not infer a PASS from absence.

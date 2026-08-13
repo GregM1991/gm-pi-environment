@@ -29,6 +29,13 @@ function runCli(repoRoot: string, record: unknown, runId?: string, env?: NodeJS.
 	});
 }
 
+function runBatchCli(repoRoot: string, records: unknown[]) {
+	return spawnSync("bun", [CLI_PATH, "--repo-root", repoRoot, "--batch", JSON.stringify(records)], {
+		cwd: import.meta.dir,
+		encoding: "utf8",
+	});
+}
+
 function runCliAsync(repoRoot: string, record: unknown, runId?: string): Promise<{ status: number | null; stderr: string }> {
 	return new Promise((resolve, reject) => {
 		const child = spawn("bun", cliArgs(repoRoot, record, runId), { cwd: import.meta.dir, stdio: ["ignore", "ignore", "pipe"] });
@@ -105,6 +112,66 @@ const findingInput = {
 	category: "correctness",
 	whyMissed: "The worker did not test empty input",
 	repeat: "none",
+};
+
+const taggedBatchInput = [{
+	recordType: "review-run",
+	issue: 50,
+	pullRequest: 70,
+	cycle: "initial",
+	source: "review-child",
+	runId: "00000000-0000-4000-8000-000000000010",
+	workerSkillPack: ["implement", "tdd"],
+	subjectSha: "a".repeat(40),
+	verdict: "FIX",
+	findingIds: ["00000000-0000-4000-8000-000000000011"],
+	suppressedDuplicateCount: 0,
+}, {
+	recordType: "finding",
+	issue: 50,
+	pullRequest: 70,
+	cycle: "initial",
+	source: "review-child",
+	runId: "00000000-0000-4000-8000-000000000010",
+	workerSkillPack: ["implement", "tdd"],
+	subjectSha: "a".repeat(40),
+	verdict: "FIX",
+	findingId: "00000000-0000-4000-8000-000000000011",
+	location: "src/delivery.ts:20",
+	severity: "medium",
+	summary: "Delivery evidence is incomplete",
+	category: "correctness",
+	whyMissed: "The final evidence link was omitted",
+	repeat: "none",
+}];
+
+const taggedPublicationInput = {
+	recordType: "publication",
+	publicationId: "00000000-0000-4000-8000-000000000012",
+	issue: 50,
+	pullRequest: 70,
+	subjectSha: "a".repeat(40),
+	source: "review-child",
+	runId: "00000000-0000-4000-8000-000000000010",
+	findingId: "00000000-0000-4000-8000-000000000011",
+	provider: "github",
+	surface: "pr-review-thread",
+	externalKey: "PRRT_kwDOexample",
+};
+
+const taggedRecapInput = {
+	recordType: "recap",
+	recapId: "00000000-0000-4000-8000-000000000013",
+	issue: 50,
+	pullRequest: 70,
+	subjectSha: "a".repeat(40),
+	source: "review-child",
+	runId: "00000000-0000-4000-8000-000000000010",
+	impactClass: "extends",
+	displayedRisk: "medium",
+	touchedRecapPrimitiveIds: ["review-ledger"],
+	removedRecapPrimitiveIds: [],
+	touchedInvariantIds: ["append-only"],
 };
 
 afterEach(() => {
@@ -456,6 +523,159 @@ mock.module("bun:ffi", () => ({
 		expect(repeatedGate.status).not.toBe(0);
 		expect(repeatedGate.stderr).toContain("AI-gate execution already recorded for issue 42");
 		expect(readFileSync(path.join(cwd, ".pi", "matt-review-ledger.jsonl"), "utf8").trim().split("\n")).toHaveLength(2);
+	});
+
+	test("atomically appends a complete tagged batch in canonical order", () => {
+		const cwd = makeRepo();
+		const result = runBatchCli(cwd, taggedBatchInput);
+
+		expect(result.status).toBe(0);
+		const response = JSON.parse(result.stdout);
+		expect(response).toEqual({ ok: true, ledgerPath: ".pi/matt-review-ledger.jsonl", appended: 2 });
+		const records = readFileSync(path.join(cwd, ".pi", "matt-review-ledger.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
+		expect(records.map((record) => record.recordType)).toEqual(["review-run", "finding"]);
+		expect(records.every((record) => record.schemaVersion === 2 && typeof record.date === "string")).toBe(true);
+	});
+
+	test("appends single-record PASS and duplicate-only tagged batches", () => {
+		for (const reviewRun of [{
+			...taggedBatchInput[0],
+			verdict: "PASS",
+			findingIds: [],
+			suppressedDuplicateCount: 0,
+		}, {
+			...taggedBatchInput[0],
+			findingIds: [],
+			suppressedDuplicateCount: 2,
+		}]) {
+			const cwd = makeRepo();
+			const result = runBatchCli(cwd, [reviewRun]);
+
+			expect(result.status).toBe(0);
+			expect(JSON.parse(result.stdout)).toEqual({ ok: true, ledgerPath: ".pi/matt-review-ledger.jsonl", appended: 1 });
+			expect(JSON.parse(readFileSync(path.join(cwd, ".pi", "matt-review-ledger.jsonl"), "utf8"))).toMatchObject(reviewRun);
+		}
+	});
+
+	test("reports the final candidate JSONL line when atomically rejecting a tagged batch", () => {
+		const cwd = makeRepo();
+		const result = runBatchCli(cwd, [
+			taggedBatchInput[0],
+			{ ...taggedBatchInput[1], subjectSha: "b".repeat(40) },
+		]);
+
+		expect(result.status).not.toBe(0);
+		expect(result.stderr).toContain(`line 2: finding ${taggedBatchInput[1].findingId} must match its review-run metadata`);
+		expect(existsSync(path.join(cwd, ".pi", "matt-review-ledger.jsonl"))).toBe(false);
+	});
+
+	test("reports the candidate line for malformed tagged record shape after existing history", () => {
+		const cwd = makeRepo();
+		expect(runBatchCli(cwd, taggedBatchInput).status).toBe(0);
+		const nextBatch = taggedBatchInput.map((record) => ({
+			...record,
+			cycle: "fix-1",
+			runId: "00000000-0000-4000-8000-000000000020",
+			...(record.recordType === "review-run"
+				? { findingIds: ["00000000-0000-4000-8000-000000000021"] }
+				: { findingId: "00000000-0000-4000-8000-000000000021", subjectSha: "not-a-full-sha" }),
+		}));
+
+		const result = runBatchCli(cwd, nextBatch);
+
+		expect(result.status).not.toBe(0);
+		expect(result.stderr).toContain("line 4: subjectSha must be a full lowercase Git SHA");
+		expect(readFileSync(path.join(cwd, ".pi", "matt-review-ledger.jsonl"), "utf8").trim().split("\n")).toHaveLength(2);
+	});
+
+	test("reports the candidate line for tagged append cadence failures", () => {
+		const cwd = makeRepo();
+		expect(runBatchCli(cwd, taggedBatchInput).status).toBe(0);
+		const duplicateCadence = taggedBatchInput.map((record) => ({
+			...record,
+			runId: "00000000-0000-4000-8000-000000000020",
+			...(record.recordType === "review-run" ? { findingIds: ["00000000-0000-4000-8000-000000000021"] } : { findingId: "00000000-0000-4000-8000-000000000021" }),
+		}));
+
+		const result = runBatchCli(cwd, duplicateCadence);
+
+		expect(result.status).not.toBe(0);
+		expect(result.stderr).toContain("line 3: review run already recorded for issue 50, pull request 70, cycle initial, source review-child, and Subject SHA");
+		expect(readFileSync(path.join(cwd, ".pi", "matt-review-ledger.jsonl"), "utf8").trim().split("\n")).toHaveLength(2);
+	});
+
+	test("rejects event UUID reuse across finding, publication, and recap records", () => {
+		const collisions = [
+			[...taggedBatchInput, { ...taggedPublicationInput, publicationId: taggedBatchInput[1].findingId }],
+			[...taggedBatchInput, { ...taggedRecapInput, recapId: taggedBatchInput[1].findingId }],
+			[...taggedBatchInput, taggedPublicationInput, { ...taggedRecapInput, recapId: taggedPublicationInput.publicationId }],
+		];
+
+		for (const batch of collisions) {
+			const cwd = makeRepo();
+			const result = runBatchCli(cwd, batch);
+
+			expect(result.status).not.toBe(0);
+			expect(result.stderr).toContain("event UUID");
+			expect(existsSync(path.join(cwd, ".pi", "matt-review-ledger.jsonl"))).toBe(false);
+		}
+	});
+
+	test("rejects standalone tagged events with their physical candidate line without changing valid history", () => {
+		for (const standaloneEvent of [taggedBatchInput[1], taggedPublicationInput, taggedRecapInput]) {
+			const cwd = makeRepo();
+			expect(runBatchCli(cwd, taggedBatchInput).status).toBe(0);
+			const ledgerPath = path.join(cwd, ".pi", "matt-review-ledger.jsonl");
+			const before = readFileSync(ledgerPath, "utf8");
+
+			const result = runBatchCli(cwd, [standaloneEvent]);
+
+			expect(result.status).not.toBe(0);
+			expect(result.stderr).toContain("line 3: --batch must contain one complete tagged review batch in canonical order");
+			expect(readFileSync(ledgerPath, "utf8")).toBe(before);
+		}
+	});
+
+	test("rejects untagged and mixed tagged/untagged batches atomically with physical candidate lines", () => {
+		const taggedPass = {
+			...taggedBatchInput[0],
+			verdict: "PASS",
+			findingIds: [],
+			suppressedDuplicateCount: 0,
+		};
+		for (const [invalidBatch, line] of [[[passInput], 1], [[taggedPass, passInput], 2]] as const) {
+			const cwd = makeRepo();
+			const result = runBatchCli(cwd, [...invalidBatch]);
+
+			expect(result.status).not.toBe(0);
+			expect(result.stderr).toContain(`line ${line}: --batch accepts tagged records only`);
+			expect(existsSync(path.join(cwd, ".pi", "matt-review-ledger.jsonl"))).toBe(false);
+		}
+	});
+
+	test("refuses partial, contradictory, out-of-order, and cadence-violating tagged batches", () => {
+		for (const invalidBatch of [
+			[taggedBatchInput[0]],
+			[taggedBatchInput[1], taggedBatchInput[0]],
+			[taggedBatchInput[0], { ...taggedBatchInput[1], subjectSha: "b".repeat(40) }],
+		]) {
+			const cwd = makeRepo();
+			const result = runBatchCli(cwd, invalidBatch);
+			expect(result.status).not.toBe(0);
+			expect(existsSync(path.join(cwd, ".pi", "matt-review-ledger.jsonl"))).toBe(false);
+		}
+
+		const cadenceRepo = makeRepo();
+		expect(runBatchCli(cadenceRepo, taggedBatchInput).status).toBe(0);
+		const duplicateCadence = taggedBatchInput.map((record) => ({
+			...record,
+			runId: "00000000-0000-4000-8000-000000000020",
+			...(record.recordType === "review-run" ? { findingIds: ["00000000-0000-4000-8000-000000000021"] } : { findingId: "00000000-0000-4000-8000-000000000021" }),
+		}));
+		const result = runBatchCli(cadenceRepo, duplicateCadence);
+		expect(result.status).not.toBe(0);
+		expect(result.stderr).toContain("review run already recorded for issue 50, pull request 70, cycle initial, source review-child, and Subject SHA");
+		expect(readFileSync(path.join(cadenceRepo, ".pi", "matt-review-ledger.jsonl"), "utf8").trim().split("\n")).toHaveLength(2);
 	});
 
 	test("recovers when a process dies while holding the ledger lock", () => {

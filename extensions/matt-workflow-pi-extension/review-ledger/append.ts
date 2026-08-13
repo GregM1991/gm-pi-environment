@@ -8,7 +8,7 @@ import { parseReviewLedger, validateReviewLedgerRecord, type ReviewLedgerRecord 
 const REVIEW_LEDGER_PATH = ".pi/matt-review-ledger.jsonl";
 
 type AppendReviewLedgerInput = Record<string, unknown>;
-type AppendReviewLedgerResult = { ledgerPath: string; record: ReviewLedgerRecord };
+type AppendReviewLedgerResult = { ledgerPath: string; records: ReviewLedgerRecord[] };
 
 const LOCK_EXCLUSIVE = 2;
 const LOCK_UN = 8;
@@ -152,10 +152,21 @@ function isV2Record(record: ReviewLedgerRecord): record is Extract<ReviewLedgerR
 	return "schemaVersion" in record;
 }
 
+function isTaggedRun(record: ReviewLedgerRecord): record is Extract<ReviewLedgerRecord, { recordType: "review-run" }> {
+	return "recordType" in record && record.recordType === "review-run";
+}
+
 function validateAppendDiscipline(existingRecords: readonly ReviewLedgerRecord[], record: ReviewLedgerRecord): string | undefined {
 	if (!isV2Record(record)) return "new ledger records must use schemaVersion 2";
 
-	if (record.source === "ai-gate") {
+	if (isTaggedRun(record)) {
+		const priorRun = existingRecords.find((existing) => isTaggedRun(existing)
+			&& existing.issue === record.issue && existing.pullRequest === record.pullRequest
+			&& existing.cycle === record.cycle && existing.source === record.source && existing.subjectSha === record.subjectSha);
+		if (priorRun) return `review run already recorded for issue ${record.issue}, pull request ${record.pullRequest}, cycle ${record.cycle}, source ${record.source}, and Subject SHA ${record.subjectSha}`;
+	}
+
+	if ("source" in record && record.source === "ai-gate") {
 		const earlierGateRecord = existingRecords.find((existing) => (
 			existing.issue === record.issue
 			&& existing.source === "ai-gate"
@@ -170,10 +181,50 @@ function validateAppendDiscipline(existingRecords: readonly ReviewLedgerRecord[]
 	return undefined;
 }
 
-function appendReviewLedgerRecord(options: {
+function validateTaggedBatch(records: readonly ReviewLedgerRecord[], firstCandidateLine: number): void {
+	const untaggedIndex = records.findIndex((record) => !("recordType" in record));
+	if (untaggedIndex !== -1) {
+		throw new Error(`line ${firstCandidateLine + untaggedIndex}: --batch accepts tagged records only`);
+	}
+	const reviewRunIndexes = records.flatMap((record, index) => isTaggedRun(record) ? [index] : []);
+	if (reviewRunIndexes.length !== 1 || reviewRunIndexes[0] !== 0) {
+		const offendingIndex = reviewRunIndexes.length > 1 ? reviewRunIndexes[1] : 0;
+		throw new Error(`line ${firstCandidateLine + offendingIndex}: --batch must contain one complete tagged review batch in canonical order`);
+	}
+	const reviewRuns = records.filter(isTaggedRun);
+	const run = reviewRuns[0];
+	let phase: "finding" | "publication" | "recap" = "finding";
+	let findingIndex = 0;
+	for (const [index, record] of records.slice(1).entries()) {
+		if (!("recordType" in record)) continue;
+		const line = firstCandidateLine + index + 1;
+		if (record.runId !== run.runId) throw new Error(`line ${line}: batch record must belong to review-run ${run.runId}`);
+		if (record.recordType === "finding") {
+			if (phase !== "finding") throw new Error(`line ${line}: tagged findings must precede publications and recap`);
+			if (record.findingId !== run.findingIds[findingIndex]) {
+				throw new Error(`line ${line}: review-run ${run.runId} findingIds must exactly match its following findings in order`);
+			}
+			findingIndex += 1;
+		} else if (record.recordType === "publication") {
+			if (phase === "recap") throw new Error(`line ${line}: publication must precede recap for its review-run`);
+			phase = "publication";
+		} else if (record.recordType === "recap") {
+			if (phase === "recap") throw new Error(`line ${line}: --batch may contain at most one recap`);
+			phase = "recap";
+		} else {
+			throw new Error(`line ${line}: --batch must contain one complete tagged review batch in canonical order`);
+		}
+	}
+	if (findingIndex !== run.findingIds.length) {
+		throw new Error(`line ${firstCandidateLine}: review-run ${run.runId} findingIds must exactly match its following findings in order`);
+	}
+}
+
+function appendReviewLedgerRecords(options: {
 	cwd: string;
-	input: AppendReviewLedgerInput;
+	inputs: AppendReviewLedgerInput[];
 	runId?: string;
+	batch: boolean;
 }): AppendReviewLedgerResult {
 	const ledgerPath = REVIEW_LEDGER_PATH;
 	const absoluteLedgerPath = path.resolve(realpathSync(options.cwd), ledgerPath);
@@ -193,37 +244,55 @@ function appendReviewLedgerRecord(options: {
 			}
 		}
 
-		for (const stampedField of ["schemaVersion", "date", "runId"] as const) {
-			if (stampedField in options.input) throw new Error(`${stampedField} is stamped by the append command and must be omitted`);
+		if (options.inputs.length === 0) throw new Error("batch must contain at least one record");
+		const separator = existingContents.length > 0 && !existingContents.endsWith("\n") ? "\n" : "";
+		const firstCandidateLine = (existingContents.match(/\n/g)?.length ?? 0) + 1 + (separator ? 1 : 0);
+		const stampedRecords: ReviewLedgerRecord[] = [];
+		for (const input of options.inputs) {
+			const candidateLine = firstCandidateLine + stampedRecords.length;
+			for (const stampedField of ["schemaVersion", "date"] as const) {
+				if (stampedField in input) {
+					const reason = `${stampedField} is stamped by the append command and must be omitted`;
+					throw new Error(options.batch ? `line ${candidateLine}: ${reason}` : reason);
+				}
+			}
+			const tagged = "recordType" in input;
+			if ("runId" in input && !(options.batch && tagged)) {
+				const reason = "runId is stamped by the append command and must be omitted";
+				throw new Error(options.batch ? `line ${candidateLine}: ${reason}` : reason);
+			}
+			const recordInput = {
+				...input,
+				schemaVersion: 2,
+				date: new Date().toISOString(),
+				...(!tagged ? { runId: options.runId ?? crypto.randomUUID() } : {}),
+			};
+			const validation = validateReviewLedgerRecord(recordInput);
+			if (!validation.ok) throw new Error(options.batch ? `line ${candidateLine}: ${validation.reason}` : validation.reason);
+			const disciplineError = validateAppendDiscipline([...existingRecords, ...stampedRecords], validation.record);
+			if (disciplineError) throw new Error(options.batch ? `line ${candidateLine}: ${disciplineError}` : disciplineError);
+			stampedRecords.push(validation.record);
 		}
-		const recordInput = {
-			...options.input,
-			schemaVersion: 2,
-			date: new Date().toISOString(),
-			runId: options.runId ?? crypto.randomUUID(),
-		};
-		const validation = validateReviewLedgerRecord(recordInput);
-		if (!validation.ok) throw new Error(validation.reason);
-		const disciplineError = validateAppendDiscipline(existingRecords, validation.record);
-		if (disciplineError) throw new Error(disciplineError);
 
-		const candidateContents = `${existingContents}${existingContents.length > 0 && !existingContents.endsWith("\n") ? "\n" : ""}${JSON.stringify(validation.record)}\n`;
+		if (options.batch) validateTaggedBatch(stampedRecords, firstCandidateLine);
+
+		const appendedContents = `${stampedRecords.map((record) => JSON.stringify(record)).join("\n")}\n`;
+		const candidateContents = `${existingContents}${separator}${appendedContents}`;
 		const candidateValidation = parseReviewLedger(candidateContents);
 		if (!candidateValidation.ok) {
-			const appendLine = candidateContents.trimEnd().split("\n").length;
-			const reason = candidateValidation.errors.find((error) => error.line === appendLine)?.reason
-				?? candidateValidation.errors.map((error) => `line ${error.line}: ${error.reason}`).join("; ");
-			throw new Error(reason);
+			const reasons = candidateValidation.errors.map((error) => `line ${error.line}: ${error.reason}`).join("; ");
+			throw new Error(reasons);
 		}
 
-		appendFileSync(absoluteLedgerPath, `${existingContents.length > 0 && !existingContents.endsWith("\n") ? "\n" : ""}${JSON.stringify(validation.record)}\n`, "utf8");
-		return { ledgerPath, record: validation.record };
+		appendFileSync(absoluteLedgerPath, `${separator}${appendedContents}`, "utf8");
+		return { ledgerPath, records: stampedRecords };
 	});
 }
 
-function parseArguments(args: string[]): { repoRoot: string; record: AppendReviewLedgerInput; runId?: string } {
+function parseArguments(args: string[]): { repoRoot: string; records: AppendReviewLedgerInput[]; runId?: string; batch: boolean } {
 	let repoRoot: string | undefined;
 	let recordJson: string | undefined;
+	let batchJson: string | undefined;
 	let runId: string | undefined;
 	for (let index = 0; index < args.length; index += 1) {
 		const argument = args[index];
@@ -235,24 +304,37 @@ function parseArguments(args: string[]): { repoRoot: string; record: AppendRevie
 		};
 		if (argument === "--repo-root") repoRoot = nextValue();
 		else if (argument === "--record") recordJson = nextValue();
+		else if (argument === "--batch") batchJson = nextValue();
 		else if (argument === "--run-id") runId = nextValue();
 		else throw new Error(`unknown argument: ${argument}`);
 	}
-	if (!repoRoot || !recordJson) throw new Error("usage: bun review-ledger/append.ts --repo-root <path> --record '<json>' [--run-id <uuidv4>]");
-	let record: unknown;
-	try {
-		record = JSON.parse(recordJson);
-	} catch {
-		throw new Error("--record must be valid JSON");
+	if (!repoRoot || Boolean(recordJson) === Boolean(batchJson)) {
+		throw new Error("usage: bun review-ledger/append.ts --repo-root <path> (--record '<json>' [--run-id <uuidv4>] | --batch '<json-array>')");
 	}
-	if (typeof record !== "object" || record === null || Array.isArray(record)) throw new Error("--record must be a JSON object");
-	return { repoRoot, record: record as AppendReviewLedgerInput, ...(runId ? { runId } : {}) };
+	if (batchJson && runId) throw new Error("--run-id cannot be used with --batch; tagged batch records carry their runId");
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(recordJson ?? batchJson as string);
+	} catch {
+		throw new Error(`${recordJson ? "--record" : "--batch"} must be valid JSON`);
+	}
+	if (recordJson) {
+		if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new Error("--record must be a JSON object");
+		return { repoRoot, records: [parsed as AppendReviewLedgerInput], ...(runId ? { runId } : {}), batch: false };
+	}
+	if (!Array.isArray(parsed) || parsed.some((record) => typeof record !== "object" || record === null || Array.isArray(record))) {
+		throw new Error("--batch must be an array of JSON objects");
+	}
+	return { repoRoot, records: parsed as AppendReviewLedgerInput[], batch: true };
 }
 
 function runAppendReviewLedgerCli(args: string[]): void {
 	const options = parseArguments(args);
-	const result = appendReviewLedgerRecord({ cwd: path.resolve(options.repoRoot), input: options.record, runId: options.runId });
-	console.log(JSON.stringify({ ok: true, ledgerPath: result.ledgerPath, runId: isV2Record(result.record) ? result.record.runId : undefined }));
+	const result = appendReviewLedgerRecords({ cwd: path.resolve(options.repoRoot), inputs: options.records, runId: options.runId, batch: options.batch });
+	const firstRecord = result.records[0];
+	console.log(JSON.stringify(options.batch
+		? { ok: true, ledgerPath: result.ledgerPath, appended: result.records.length }
+		: { ok: true, ledgerPath: result.ledgerPath, runId: firstRecord && "runId" in firstRecord ? firstRecord.runId : undefined }));
 }
 
 if (import.meta.main) {

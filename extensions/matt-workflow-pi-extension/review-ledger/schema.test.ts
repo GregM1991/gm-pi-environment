@@ -60,6 +60,77 @@ const v2Pass = {
 	workerSkillPack: ["implement", "tdd"],
 };
 
+const taggedRun = {
+	schemaVersion: 2,
+	recordType: "review-run",
+	date: "2026-02-24T17:00:00.000Z",
+	issue: 50,
+	pullRequest: 70,
+	cycle: "initial",
+	source: "review-child",
+	runId: "00000000-0000-4000-8000-000000000010",
+	workerSkillPack: ["implement", "tdd"],
+	subjectSha: "a".repeat(40),
+	verdict: "FIX",
+	findingIds: ["00000000-0000-4000-8000-000000000011"],
+	suppressedDuplicateCount: 0,
+};
+
+const taggedFinding = {
+	schemaVersion: 2,
+	recordType: "finding",
+	date: "2026-02-24T17:00:01.000Z",
+	issue: 50,
+	pullRequest: 70,
+	cycle: "initial",
+	source: "review-child",
+	runId: taggedRun.runId,
+	workerSkillPack: ["implement", "tdd"],
+	subjectSha: taggedRun.subjectSha,
+	verdict: "FIX",
+	findingId: taggedRun.findingIds[0],
+	location: "src/delivery.ts:20",
+	severity: "medium",
+	summary: "Delivery evidence is incomplete",
+	category: "correctness",
+	whyMissed: "The worker omitted the final evidence link",
+	repeat: "none",
+};
+
+const taggedPublication = {
+	schemaVersion: 2,
+	recordType: "publication",
+	date: "2026-02-24T17:00:02.000Z",
+	publicationId: "00000000-0000-4000-8000-000000000012",
+	issue: 50,
+	pullRequest: 70,
+	subjectSha: taggedRun.subjectSha,
+	source: "review-child",
+	runId: taggedRun.runId,
+	findingId: taggedFinding.findingId,
+	provider: "github",
+	surface: "pr-review-thread",
+	externalKey: "PRRT_kwDOexample",
+	url: "https://github.com/example/repo/pull/70#discussion_r1",
+};
+
+const taggedRecap = {
+	schemaVersion: 2,
+	recordType: "recap",
+	date: "2026-02-24T17:00:03.000Z",
+	recapId: "00000000-0000-4000-8000-000000000013",
+	issue: 50,
+	pullRequest: 70,
+	subjectSha: taggedRun.subjectSha,
+	source: "review-child",
+	runId: taggedRun.runId,
+	impactClass: "extends",
+	displayedRisk: "medium",
+	touchedRecapPrimitiveIds: ["review-ledger"],
+	removedRecapPrimitiveIds: [],
+	touchedInvariantIds: ["append-only", "producer-identity"],
+};
+
 function parseRecords(records: unknown[]) {
 	return parseReviewLedger(records.map((record) => JSON.stringify(record)).join("\n"));
 }
@@ -289,6 +360,118 @@ describe("review ledger v2 relationships", () => {
 		}]);
 		expect(conflictingMetadata.ok).toBe(false);
 		if (!conflictingMetadata.ok) expect(conflictingMetadata.errors[0]?.reason).toContain("incompatible issue, cycle, source, or workerSkillPack metadata");
+	});
+});
+
+describe("tagged v2 review ledger", () => {
+	test("preserves legacy and untagged v2 history while validating a complete tagged batch", () => {
+		const fixture = readFileSync(join(import.meta.dir, "fixtures", "mixed-legacy-untagged-tagged-v2.jsonl"), "utf8");
+		const result = parseReviewLedger(fixture);
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.records).toHaveLength(9);
+		expect(result.records.slice(0, 5)).toEqual(parseReviewLedger(readFileSync(join(import.meta.dir, "fixtures", "mixed-legacy-v2.jsonl"), "utf8")).records);
+		expect(result.records.slice(5).map((record) => "recordType" in record ? record.recordType : undefined)).toEqual([
+			"review-run", "finding", "publication", "recap",
+		]);
+	});
+
+	test("makes the run summary the sole denominator and validates pre-suppression verdict rules", () => {
+		expect(parseRecords([{ ...taggedRun, verdict: "PASS", findingIds: [], suppressedDuplicateCount: 0 }]).ok).toBe(true);
+		expect(parseRecords([{ ...taggedRun, findingIds: [], suppressedDuplicateCount: 2 }]).ok).toBe(true);
+		expect(parseRecords([{ ...taggedRun, verdict: "BLOCKER", findingIds: [], suppressedDuplicateCount: 2 }]).ok).toBe(true);
+		expect(parseRecords([{ ...taggedRun, verdict: "PASS", findingIds: [], suppressedDuplicateCount: 1 }])).toEqual({
+			ok: false,
+			errors: [{ line: 1, reason: "PASS review-run requires no findings and zero suppressed duplicates" }],
+		});
+		expect(parseRecords([{ ...taggedRun, findingIds: [], suppressedDuplicateCount: 0 }])).toEqual({
+			ok: false,
+			errors: [{ line: 1, reason: "FIX or BLOCKER review-run requires findings or suppressed duplicates" }],
+		});
+	});
+
+	test("rejects interleaved tagged batches at the physical boundary line", () => {
+		const secondRun = {
+			...taggedRun,
+			issue: 51,
+			pullRequest: 71,
+			runId: "00000000-0000-4000-8000-000000000020",
+			subjectSha: "b".repeat(40),
+			findingIds: ["00000000-0000-4000-8000-000000000021"],
+		};
+		const secondFinding = {
+			...taggedFinding,
+			issue: secondRun.issue,
+			pullRequest: secondRun.pullRequest,
+			runId: secondRun.runId,
+			subjectSha: secondRun.subjectSha,
+			findingId: secondRun.findingIds[0],
+		};
+
+		const result = parseRecords([taggedRun, secondRun, taggedFinding, secondFinding]);
+
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.errors).toContainEqual({
+			line: 2,
+			reason: `tagged review-run ${secondRun.runId} cannot begin before review-run ${taggedRun.runId} has all declared findings`,
+		});
+	});
+
+	test("enforces tagged run/finding identity, order, Subject SHA, source, and verdict", () => {
+		expect(parseRecords([taggedFinding, taggedRun]).ok).toBe(false);
+		expect(parseRecords([taggedRun, { ...taggedFinding, subjectSha: "b".repeat(40) }])).toEqual({
+			ok: false,
+			errors: [{ line: 2, reason: `finding ${taggedFinding.findingId} must match its review-run metadata` }],
+		});
+		expect(parseRecords([taggedRun, { ...taggedFinding, verdict: "BLOCKER" }])).toEqual({
+			ok: false,
+			errors: [{ line: 1, reason: `review-run ${taggedRun.runId} verdict must match observed findings before duplicate suppression` }],
+		});
+		expect(parseRecords([{ ...taggedRun, findingIds: [taggedFinding.findingId, "00000000-0000-4000-8000-000000000099"] }, taggedFinding]).ok).toBe(false);
+	});
+
+	test("enforces publication identity, surface mapping, and earlier matching antecedents", () => {
+		expect(parseRecords([taggedRun, taggedFinding, taggedPublication]).ok).toBe(true);
+		expect(parseRecords([taggedPublication, taggedRun, taggedFinding]).ok).toBe(false);
+		expect(parseRecords([taggedRun, taggedFinding, { ...taggedPublication, surface: "pr-review-summary" }])).toEqual({
+			ok: false,
+			errors: [{ line: 3, reason: "pr-review-summary publication must omit findingId" }],
+		});
+		expect(parseRecords([taggedRun, taggedFinding, taggedPublication, {
+			...taggedPublication,
+			publicationId: "00000000-0000-4000-8000-000000000014",
+		}]).ok).toBe(false);
+	});
+
+	test("enforces recap antecedent, uniqueness, sorted identifiers, and risk mapping", () => {
+		expect(parseRecords([taggedRun, taggedFinding, taggedRecap]).ok).toBe(true);
+		expect(parseRecords([taggedRecap, taggedRun, taggedFinding]).ok).toBe(false);
+		expect(validateReviewLedgerRecord({ ...taggedRecap, touchedInvariantIds: ["z", "a"] })).toEqual({
+			ok: false,
+			reason: "touchedInvariantIds must be sorted and unique",
+		});
+		expect(validateReviewLedgerRecord({ ...taggedRecap, displayedRisk: "low" })).toEqual({
+			ok: false,
+			reason: "extends recap must use displayedRisk medium",
+		});
+		expect(validateReviewLedgerRecord({ ...taggedRecap, removedRecapPrimitiveIds: ["old-module"] })).toEqual({
+			ok: false,
+			reason: "recap with removed primitives must use displayedRisk high",
+		});
+		expect(parseRecords([taggedRun, taggedFinding, taggedRecap, {
+			...taggedRecap,
+			recapId: "00000000-0000-4000-8000-000000000014",
+		}]).ok).toBe(false);
+	});
+
+	test("reports tagged relationship failures at their JSONL line", () => {
+		const result = parseRecords([taggedRun, taggedFinding, { ...taggedPublication, runId: "00000000-0000-4000-8000-000000000099" }]);
+		expect(result).toEqual({
+			ok: false,
+			errors: [{ line: 3, reason: "publication runId must resolve to a strictly earlier tagged review-run" }],
+		});
 	});
 });
 
