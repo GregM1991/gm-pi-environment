@@ -12,15 +12,20 @@ Repos need a durable, repo-agnostic way to state these conventions explicitly wi
 
 ## Decision
 
-Add a sibling config file at `.pi/matt-conventions.json` with required `version: 1`.
+Add a sibling config file at `.pi/matt-conventions.json` with required `version: 1` or `version: 2`.
 
 The file describes repo conventions rather than extension routing behavior. It sits next to `.pi/matt-skill-routes.json` but has an independent schema.
 
-Version 1 supports optional sections:
+Version 1 remains unchanged and supports optional sections:
 
 - `tracker`: GitHub Issues tracker type plus labels doc path.
-- `toolchain`: runtime name plus optional `test`, `check`, and `build` commands.
+- `toolchain`: runtime name plus optional `test`, `check`, `build`, and `aiGate` commands.
 - `docs`: workflow doc path plus optional extra context docs.
+
+Version 2 adds delivery policy without changing the existing sections' fallback behavior:
+
+- `tracker.requiredChecks`: a required, non-empty, duplicate-free list whenever the v2 tracker section is configured.
+- `architecture.recapPrimitivesPath`: an optional reference to the owner-curated recap-primitive map.
 
 Load semantics:
 
@@ -28,13 +33,16 @@ Load semantics:
 - Config file exists and is valid: explicit section values win. Omitted sections fall back to detection for that section only.
 - Config file exists and is invalid: hard stop every command that injects `baseContext()`. The extension notifies formatted diagnostics and does not send the phase prompt.
 
-Validation is strict: JSON parsing, version checking, unknown-field rejection at every level, supported enum values, and repo-relative doc path checks. Referenced docs must exist on disk.
+Validation is strict: JSON parsing, version checking, unknown-field rejection at every level, supported enum values, required-check list validation, and repo-relative doc path checks. Referenced docs, including a configured recap-primitive map, must exist on disk.
+
+Delivery callers resolve required-check policy through the configuration Module's public Interface. Native GitHub required policy takes precedence when available. Otherwise v2 `tracker.requiredChecks` is authoritative. If neither exists, resolution returns an explicit hard-stop result; callers must not infer policy from observed checks. Version 1 repositories continue to load normally, but do not supply configured delivery policy.
 
 ## Consequences
 
 Positive:
 
-- Repos can record conventions explicitly and portably.
+- Repos can record conventions and delivery policy explicitly and portably.
+- Existing version 1 repositories retain their current load and per-section fallback behavior.
 - Skill routing can evolve separately from conventions.
 - A broken conventions file fails loudly instead of silently sending wrong prompts.
 - Partial config stays ergonomic because omitted sections keep existing detection behavior.

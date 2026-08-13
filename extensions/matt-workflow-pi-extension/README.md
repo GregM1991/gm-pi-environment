@@ -154,7 +154,7 @@ Normal phase prompts also carry a lightweight reminder to use this lens only whe
 
 ## Repo conventions config
 
-Commands that inject base phase context can read optional strict repo JSON at `.pi/matt-conventions.json` (`version: 1`). This file is a sibling to `.pi/matt-skill-routes.json`; it controls repo convention hints, not skill routing.
+Commands that inject base phase context can read optional strict repo JSON at `.pi/matt-conventions.json` (`version: 1` or `version: 2`). This file is a sibling to `.pi/matt-skill-routes.json`; it controls repo convention hints and delivery policy, not skill routing.
 
 Config shape:
 
@@ -183,7 +183,25 @@ Config shape:
 
 All sections are optional except `version`. If the file is absent, existing detection runs. If the file is present and valid, configured sections win and omitted sections fall back to detection independently. If the file exists but is invalid, every command that would send a base-context phase prompt hard-stops with diagnostics instead of silently falling back.
 
-Doc paths must be repo-relative local paths, must stay inside the repo, and must exist on disk. `tracker.type` supports only `github-issues` in v1. Most toolchain commands are hint-only; agents see them as preferred verification commands, but the extension does not execute them automatically. Supported command keys are `test`, `check`, `build`, and `aiGate`.
+Version 1 remains valid unchanged. Version 2 adds strict delivery policy:
+
+```json
+{
+  "version": 2,
+  "tracker": {
+    "type": "github-issues",
+    "labelsDocPath": "docs/agents/triage-labels.md",
+    "requiredChecks": ["Fallow Audit / fallow-audit", "matt/ai-gate"]
+  },
+  "architecture": {
+    "recapPrimitivesPath": "docs/architecture/recap-primitives.yaml"
+  }
+}
+```
+
+When the v2 `tracker` section is present, `requiredChecks` must be a non-empty, duplicate-free list of non-empty check names. Delivery resolution prefers native GitHub required policy, falls back to this configured list, and returns an explicit hard-stop when neither exists; observed check runs are never inferred as policy. The optional recap map reference has classifier semantics and is therefore separate from `docs.extraContextDocs`.
+
+Doc paths must be repo-relative local paths, must stay inside the repo, and must exist on disk. This includes `architecture.recapPrimitivesPath`. `tracker.type` supports only `github-issues`. Most toolchain commands are hint-only; agents see them as preferred verification commands, but the extension does not execute them automatically. Supported command keys are `test`, `check`, `build`, and `aiGate`.
 
 `toolchain.commands.aiGate` is optional and review-specific. When present, `/matt-review` prompts require the agent to run that command and fold must-fix/should-fix findings into the verdict, or report the gate failure explicitly. `/matt-auto` instead runs the command exactly once per issue after the issue commit and before closeout, and captures the gate as a distinct ledger source using the mapping and per-issue deduplication contract in [`augmentations/auto.md`](./augmentations/auto.md). Example: `"aiGate": "bun run ai-gate --base main --head HEAD"`.
 
