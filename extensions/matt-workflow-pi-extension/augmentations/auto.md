@@ -2,6 +2,12 @@
 
 Record formats for the repo-local `.pi/matt-review-ledger.jsonl`, layered on top of the `/matt-auto` phase. Lifecycle rules (when to append, commit placement, and loop-log reporting) live in the auto phase prompt; this file owns the normative JSONL format and closed taxonomies.
 
+## Validating append command
+
+Append every new record through `(cd <extension-root> && bun run review-ledger:append -- --repo-root <target-repo-root> --record '<json>' [--run-id <uuidv4>])`. Supply the record fields documented below without `schemaVersion`, `date`, or `runId`; the command sets `schemaVersion: 2`, stamps the current ISO 8601 UTC date, and generates the run UUID. For additional findings from the same review execution, pass the `runId` returned by the first successful append with `--run-id`.
+
+The command validates the complete existing ledger plus the candidate record before appending. It rejects malformed or out-of-taxonomy records, incompatible run reuse including PASS mixed with findings, duplicate finding identities, invalid repeat provenance, and a second AI-gate run for the same issue. A rejection prints a specific reason and exits non-zero without appending. Treat any rejection as a hard stop: never work around it by writing, echoing, or editing a JSONL line directly.
+
 ## Per-issue review packet
 
 Before launching any implementation, fix, or review child for an issue, write a packet outside the worktree at `${TMPDIR:-/tmp}/matt-auto-review-packets/<repo-id>/<issue>.md`. Derive `<repo-id>` from the repository root identity: use the canonical `owner/name` from the normalized `origin` URL when available, otherwise the real absolute worktree path; UTF-8 encode that identity, base64url encode it without padding, and prefix it with `gh-` or `path-` respectively. This is collision-safe and contains only `[A-Za-z0-9_-]`. Create the packet root and repository directory with mode `0700` and each packet with mode `0600` (correct existing modes before use). Never stage or commit this temporary artifact, and exclude it explicitly from dirty-worktree stop handling. Delete the issue packet after successful issue closeout; on every loop termination path, delete all packets created by that run, remove the now-empty `<repo-id>` directory, and remove the packet root if it is empty.

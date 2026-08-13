@@ -30,6 +30,7 @@
   "scripts": {
     "check": "bun --check index.ts scripts/sync-matt-skills.ts skill-routing/*.ts conventions/*.ts review-ledger/*.ts",
     "test": "bun test auto-loop.test.ts scripts/*.test.ts skill-routing/*.test.ts conventions/*.test.ts review-ledger/*.test.ts",
+    "review-ledger:append": "bun review-ledger/append.ts",
     "sync:matt-skills": "bun scripts/sync-matt-skills.ts",
     "sync:matt-skills:dry-run": "bun scripts/sync-matt-skills.ts --dry-run"
   },

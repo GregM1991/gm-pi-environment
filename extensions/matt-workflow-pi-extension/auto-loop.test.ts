@@ -152,6 +152,8 @@ describe("Wayfinder automation boundaries", () => {
 		expect(auto).toContain("append-only");
 		expect(auto).toContain("closed category taxonomy");
 		expect(auto).toContain("exactly as documented in `augmentations/auto.md`");
+		expect(auto).toContain("Append every new ledger record only through the validating command");
+		expect(auto).toContain("Treat a rejected append as a hard stop");
 		expect(auto).not.toContain("Require file:line findings, severity, one-line summaries");
 		expect(auto).toContain('source: `review-child`');
 		expect(auto).toContain("same issue commit");
@@ -178,6 +180,10 @@ describe("Wayfinder automation boundaries", () => {
 		expect(auto).toContain("whether the prevention stop rule fired");
 
 		const augmentation = readFileSync(path.join(import.meta.dir, "augmentations", "auto.md"), "utf8");
+		expect(augmentation).toContain("bun run review-ledger:append");
+		expect(augmentation).toContain("--repo-root <target-repo-root>");
+		expect(augmentation).toContain("generates the run UUID");
+		expect(augmentation).toContain("never work around it by writing, echoing, or editing a JSONL line directly");
 		expect(augmentation).toContain("Unversioned records are legacy");
 		expect(augmentation).toContain("Every newly appended record uses `schemaVersion: 2`");
 		expect(augmentation).toContain("`repeatsFindingId`");
