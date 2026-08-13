@@ -208,6 +208,14 @@ Doc paths must be repo-relative local paths, must stay inside the repo, and must
 
 Use `/matt-init-conventions` to create the scaffold without overwriting an existing file.
 
+## Normalized GitHub PR evidence
+
+Delivery callers consume GitHub PR state through the `github-evidence` Module rather than treating observed checks as repository policy. Its Adapter Interface reads PR/head identity, native required policy, check runs, legacy commit statuses, check annotations, review summaries, and GraphQL review threads. Native policy wins; callers may supply conventions-v2 required checks as fallback, and absence of both is an explicit hard stop.
+
+`collectGithubEvidence()` returns the complete normalized observation surfaces plus a compact packet containing only required blocking checks, blocking annotations and review summaries, unresolved non-outdated threads, optional browser state, and exact evidence/refresh references. `reconcileGithubEvidence()` supports external wakeups or polling at 15 seconds for the first 2 minutes, 30 seconds through 10 minutes, then 60 seconds; it honors rate-limit waits within fixed 30-minute per-head and 90-minute per-transaction budgets. A timeout keeps unfinished checks pending rather than relabeling them failed.
+
+The Module is transport-independent: production delivery code supplies a GitHub Adapter, while behavior tests use deterministic Adapters for pagination, permissions, rate limits, stale heads, unknown responses, wakeups, and time.
+
 ## Issue-aware skill routing
 
 Routing-aware commands use typed extension defaults plus optional strict repo JSON at `.pi/matt-skill-routes.json` (`version: 1`). Defaults keep the baselines small (worker: `implement`, `tdd`; review: `code-review`) and add ticket-specific routed skills only when issue labels/title/body/path hints provide evidence.
