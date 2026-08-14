@@ -219,6 +219,12 @@ Delivery callers consume GitHub PR state through the `github-evidence` Module ra
 
 The Module is transport-independent: production delivery code supplies a GitHub Adapter, while behavior tests use deterministic Adapters for pagination, permissions, rate limits, stale heads, unknown responses, wakeups, and time.
 
+## GitHub review evidence publication
+
+Delivery callers publish Matt-owned evidence through the `github-publication` Interface. Reviewer-child output is one native review containing a marked summary and marked finding threads. The Interface reads those stable run/finding markers back from GitHub before returning ledger-ready Publication records; retries and duplicate requests reconcile by marker, while partial, duplicate, permission-denied, or unresolved mutations block handoff.
+
+The same Interface runs the AI gate once on the code Subject SHA and publishes `matt/ai-gate` as a check with finding-marked annotations. A later evidence head receives an exact projection of the captured conclusion, title, Subject marker, summary, annotations, and finding markers without repeating inference; divergent existing output blocks reconciliation. Check publication accepts a separate injected Adapter only after its capability probe reports externally supplied credentials for the configured expected GitHub App and exactly Checks write permission. Confirmed checks carry their creating App identity, and only checks attributed to that expected App reconcile. Repository credentials, foreign Apps, and GitHub App secrets read from repository state are not accepted.
+
 ## Issue-aware skill routing
 
 Routing-aware commands use typed extension defaults plus optional strict repo JSON at `.pi/matt-skill-routes.json` (`version: 1`). Defaults keep the baselines small (worker: `implement`, `tdd`; review: `code-review`) and add ticket-specific routed skills only when issue labels/title/body/path hints provide evidence.
