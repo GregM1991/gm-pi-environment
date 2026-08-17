@@ -1,7 +1,6 @@
 ---
 name: btca-cli
 description: Install, configure, and operate the btca CLI for local resources and source-first answers. Use when setting up btca in a project, connecting a provider, adding or managing resources, and asking questions via btca commands. Invoke this skill when the user says "use btca" or needs to do more detailed research on a specific library or framework.
-disable-model-invocation: true
 ---
 
 # btca CLI

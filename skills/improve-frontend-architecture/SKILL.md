@@ -1,7 +1,6 @@
 ---
 name: improve-frontend-architecture
 description: Find deepening opportunities in frontend code, especially React routes, UI modules, hooks, forms, state modules, and presenter modules. Use when the user wants to improve frontend architecture, find shallow UI modules, simplify routes, consolidate interaction rules, improve testability, or make frontend code more AI-navigable.
-disable-model-invocation: true
 ---
 
 # Improve Frontend Architecture

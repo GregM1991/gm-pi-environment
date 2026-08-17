@@ -1,7 +1,6 @@
 ---
 name: react-performance-guidelines
 description: Review and write React code through render boundaries, state ownership, hot paths, and justified memoization. Use before implementing React features with meaningful interaction/update paths, or when reviewing React PRs for performance and architectural coupling.
-disable-model-invocation: true
 ---
 
 <objective>
