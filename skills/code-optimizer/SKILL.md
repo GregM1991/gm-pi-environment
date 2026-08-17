@@ -10,6 +10,7 @@ description: >
   review, quality audit, or bug hunt; use the code-review skill for those. Use when asked to:
   "optimize my code", "find performance issues", "speed up my app", "find bottlenecks",
   "reduce latency", "find slow code", "performance audit", "code optimization".
+disable-model-invocation: true
 ---
 
 # Code Optimizer

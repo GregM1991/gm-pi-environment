@@ -1,6 +1,7 @@
 ---
 name: review-react-codebase-red-flags
 description: Reviews React and TypeScript codebases for maintainability red flags from senior frontend practice. Use when auditing React code, reviewing frontend architecture, finding code smells, preparing refactors, or checking whether a React codebase will be painful to maintain.
+disable-model-invocation: true
 ---
 
 <objective>

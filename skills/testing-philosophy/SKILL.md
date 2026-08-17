@@ -4,6 +4,7 @@ description: |
   Core testing philosophy for TypeScript applications: behavior-based testing,
   integration over unit, and the Two Users principle.
   Use when writing tests, reviewing test quality, or assessing test coverage.
+disable-model-invocation: true
 ---
 
 # Testing Philosophy
