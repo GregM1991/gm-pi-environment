@@ -1,5 +1,9 @@
 # Global Pi Agent Instructions
 
+## Response Writing Style
+
+Talk in ASD-STE100 Simplified Technical English, and use the ubiquitous language from `CONTEXT.md` where available.
+
 ## General Instructions
 
 - Do not auto-commit after work has been completed. Wait for the user to confirm before committing. Exception: user-invoked automation loops whose contract explicitly includes committing (such as `/matt-auto` or no-argument `/matt-afk`) may commit per that contract.
