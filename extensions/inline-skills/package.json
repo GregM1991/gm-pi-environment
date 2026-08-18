@@ -9,7 +9,8 @@
     "README.md"
   ],
   "scripts": {
-    "check": "bun --check index.ts"
+    "check": "bun --check index.ts",
+    "test": "bun test"
   },
   "keywords": [
     "pi",
@@ -30,7 +31,8 @@
   },
   "homepage": "https://github.com/GregM1991/gm-pi-environment/tree/main/extensions/inline-skills#readme",
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*"
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
   },
   "pi": {
     "extensions": [

@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { fuzzyFilter } from "@earendil-works/pi-tui";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
@@ -92,13 +93,12 @@ export default function inlineSkillsExtension(pi: ExtensionAPI) {
 
 				const typedName = normalizeSkillName(match[1] ?? "");
 				const skillCommands = getSkillCommands(pi);
-				const items = [...skillCommands.entries()]
-					.filter(([name]) => name.startsWith(typedName))
-					.map(([name, command]) => ({
-						value: `#${name}`,
-						label: `#${name}`,
-						description: command.description,
-					}));
+				const matchingSkills = fuzzyFilter([...skillCommands.entries()], typedName, ([name]) => name);
+				const items = matchingSkills.map(([name, command]) => ({
+					value: `#${name}`,
+					label: `#${name}`,
+					description: command.description,
+				}));
 
 				return {
 					prefix: `#${match[1] ?? ""}`,

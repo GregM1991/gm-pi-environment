@@ -22,11 +22,12 @@ Can you fix this using #diagnose and #testing-philosophy?
 
 ## Autocomplete
 
-The extension adds autocomplete for inline skill references. Type `#` anywhere in the editor to show all skills, or continue typing to filter them:
+The extension adds fuzzy autocomplete for inline skill references. Type `#` anywhere in the editor to show all skills, or continue typing any part of a skill name to filter them:
 
 ```text
 #
 #diag
+#style       # suggests writing-style
 ```
 
 ## Install
