@@ -61,13 +61,6 @@ function extractInlineSkillNames(text: string): string[] {
 	return [...names];
 }
 
-function stripInlineSkillMarkers(text: string): string {
-	return text
-		.replace(INLINE_SKILL_PATTERN, () => "")
-		.replace(/\s{2,}/g, " ")
-		.trim();
-}
-
 function getSkillCommands(pi: ExtensionAPI): Map<string, SkillCommand> {
 	const skillCommands = new Map<string, SkillCommand>();
 	for (const command of pi.getCommands()) {
@@ -152,13 +145,11 @@ export default function inlineSkillsExtension(pi: ExtensionAPI) {
 			ctx.ui.notify(`Inline skill(s) not found: ${missingSkills.join(", ")}`, "warning");
 		}
 
-		const cleanedUserText = stripInlineSkillMarkers(event.text) || event.text;
-
 		// For the common single-skill case, delegate to Pi's native /skill:name
 		// expansion after input handlers run. This keeps inline skills byte-for-byte
 		// aligned with out-of-the-box leading /skill:name behavior.
 		if (loadedSkills.length === 1) {
-			const transformedText = `/skill:${loadedSkills[0]!.name}${cleanedUserText ? ` ${cleanedUserText}` : ""}`;
+			const transformedText = `/skill:${loadedSkills[0]!.name} ${event.text}`;
 			ctx.ui.notify(`Loaded inline skill(s): ${loadedSkills.map((skill) => skill.name).join(", ")}`, "info");
 			return { action: "transform", text: transformedText, images: event.images };
 		}
@@ -172,7 +163,7 @@ export default function inlineSkillsExtension(pi: ExtensionAPI) {
 			)
 			.join("\n\n");
 
-		const transformedText = `${skillBlocks}\n\n${cleanedUserText}`;
+		const transformedText = `${skillBlocks}\n\n${event.text}`;
 
 		ctx.ui.notify(`Loaded inline skill(s): ${loadedSkills.map((skill) => skill.name).join(", ")}`, "info");
 		return { action: "transform", text: transformedText, images: event.images };

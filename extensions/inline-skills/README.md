@@ -46,5 +46,6 @@ pi install /home/gm/workspace/pi-environment
 
 ## Notes
 
+- Inline skill markers remain in the user message after their skill instructions are loaded.
 - Native leading `/skill:name ...` prompts are left untouched and handled by Pi itself.
 - Inline references load currently discovered skills. If you add new skill files while Pi is running, reload Pi first so they are discoverable.
