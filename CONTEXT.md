@@ -70,6 +70,18 @@ _Avoid_: interactive implementation session
 The continuous orchestration mode that implements, reviews, commits, and closes ready-for-agent issues serially until a stop rule fires. Parent/PRD issues expand into their child queue and are never implemented or closed directly.
 _Avoid_: parallel workers, parent auto-close
 
+**Planning Pass**:
+An optional read-only Auto Loop step after issue selection, routing, and review-packet creation but before implementation. It returns an advisory plan, a justified skip, or a blocker; it never changes accepted scope and does not apply to the AFK Loop.
+_Avoid_: implementation plan mandate, AFK planning stage
+
+**Planner Child**:
+The dedicated fresh-context, mechanically read-only AI role that runs the Planning Pass and returns a bounded structured handoff. It can identify a required human decision, but the decision is optional output and the Planner Child never supplies the human answer.
+_Avoid_: planning worker, human proxy, generic delegate
+
+**Auto Loop Attempt**:
+One instrumented Auto Loop execution for a selected issue, from selection through its terminal outcome, identified by a stable attempt ID across planning, worker, review, and closeout evidence.
+_Avoid_: review run, issue history
+
 **Parent Orchestrator**:
 The session running the Auto Loop. It resolves the queue and launches fresh child agents for implementation and review; it does not implement directly, and child agents do not run their own subagent workflows.
 _Avoid_: worker-orchestrator hybrid
