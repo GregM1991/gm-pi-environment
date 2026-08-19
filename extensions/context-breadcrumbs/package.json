@@ -1,0 +1,36 @@
+{
+  "name": "gm-context-breadcrumbs",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Global Pi Environment configuration wrapper for pi-context-breadcrumbs.",
+  "type": "module",
+  "main": "index.ts",
+  "files": [
+    "index.ts",
+    "README.md"
+  ],
+  "scripts": {
+    "check": "bun --check index.ts",
+    "test": "bun test"
+  },
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "context",
+    "agents"
+  ],
+  "author": "GregM1991",
+  "license": "MIT",
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "dependencies": {
+    "pi-context-breadcrumbs": "2.1.0"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

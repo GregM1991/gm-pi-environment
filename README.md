@@ -80,6 +80,10 @@ The auto-loop parent is the current Pi session, not another named subagent. For 
 
 The `file-search` extension registers `fd` (file discovery) and `rg` (content search) as model tools. It prefers system binaries (`fd`/`fdfind` and `rg`), then cached package binaries, and otherwise downloads verified official releases on supported macOS/Linux arm64/x64 systems.
 
+## Nested context breadcrumbs
+
+The `context-breadcrumbs` extension wraps `pi-context-breadcrumbs` so user-level settings can define the default breadcrumb filenames for every Pi project. The portable configuration loads only `AGENTS.md` and `AGENTS.override.md`; project `.pi/settings.json` or `.pi/context-breadcrumbs.json` files can still override that default.
+
 ## Local-only resources
 
 Mindspace prompts and other machine-specific prompts may remain in `~/.pi/agent/prompts`. Shared prompts belong in this repository.
