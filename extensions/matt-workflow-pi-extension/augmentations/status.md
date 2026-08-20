@@ -4,5 +4,4 @@ Local policy layered on top of upstream Matt engineering skills for `/matt-statu
 
 - Summarize workflow progress without implementing or changing tracker state.
 - Check relevant GitHub issue references, changed files, docs/features artifacts, labels, and milestone association when a target is obvious.
-- For milestone review, treat milestones as human-facing delivery arcs, not AFK execution units and not parent/child hierarchy sources.
-- Report spec/container issues, child issues discovered from spec child sections, ready-for-agent work, blockers, orphan milestone issues, and next human decisions.
+- At a milestone reporting branch, read the canonical Milestone reference supplied by the generated Phase message and follow its reporting and mutation rules.

@@ -70,22 +70,9 @@ Run `/matt-retro` after enough records accumulate to close the capture → retro
 
 ## Milestone delivery arcs
 
-GitHub milestones are optional human-facing delivery arcs above the normal Matt workflow hierarchy. They group related specs and their descendant implementation tickets so a developer can see when a feature direction is ready to tie up in a bow.
+GitHub milestones are optional delivery arcs for grouping related specs and implementation tickets. Use `/matt-milestone [name|#]` for a read-only review.
 
-The hierarchy remains:
-
-```text
-Milestone = strategic delivery arc
-spec issue = coherent destination / feature proposal
-Child issue = independently agentable tracer-bullet ticket
-Labels = execution/readiness state
-```
-
-Milestones do **not** replace parent/child issue relationships and are not readiness state. `/matt-spec` may associate a confirmed milestone with a spec. `/matt-tickets` may inherit a spec milestone onto created child issues for GitHub progress tracking. `/matt-auto` treats a milestone only as an optional queue filter; shared milestone membership alone is not enough to infer a spec/child hierarchy.
-
-Use `/matt-milestone [name|#]` to inspect an open delivery arc: specs, discovered child issues, ready-for-agent work, blockers, orphan milestone issues, and the next human decision needed. It is read-only by default and should not create, close, or mutate milestones unless explicitly asked in a follow-up.
-
-See [`docs/agents/milestones.md`](./docs/agents/milestones.md) for the detailed convention.
+[`docs/agents/milestones.md`](./docs/agents/milestones.md) is the canonical agent reference for Milestone semantics, hierarchy boundaries, inheritance, Auto filtering, reporting, and mutations. Generated Phase messages point to it only when their active branch needs those rules.
 
 ## Install
 

@@ -51,4 +51,15 @@ Use `/matt-milestone [name|#]` for a read-only delivery-arc review. It should su
 - Specs that have not been decomposed into tickets yet.
 - Blockers, needs-info/ready-for-human items, and the next human decision needed.
 
-Do not create, close, relabel, or mutate issues or milestones during `/matt-milestone` unless the user explicitly asks in a follow-up.
+`/matt-status` uses the same reporting model when its target belongs to a milestone, but keeps the milestone portion proportional to the broader workflow-status report.
+
+## Mutations and closeout
+
+Milestone association and lifecycle changes always require explicit user direction:
+
+- `/matt-spec` may associate a spec only after the user confirms the exact milestone title and optional due date. Ask before creating a missing milestone.
+- `/matt-tickets` may inherit an existing spec milestone onto its children unless the user says otherwise; note the applied milestone in the generated parent child index.
+- `/matt-milestone` and `/matt-status` are read-only. Do not create, assign, close, relabel, or otherwise mutate issues or milestones from their reporting branches unless the user explicitly asks in a follow-up.
+- `/matt-closeout` may report milestone state while closing a named issue, but closing that issue never implies closing its milestone. Close a milestone only after the user separately asks and confirms.
+
+When reporting milestone state during issue closeout, classify the delivery arc as complete, still containing open specs or child work, or needing human cleanup. Do not infer completion from the named issue alone.

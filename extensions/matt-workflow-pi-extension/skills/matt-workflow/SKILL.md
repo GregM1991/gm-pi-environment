@@ -20,8 +20,7 @@ Do not treat this file as the full workflow specification. The extension loads a
 - Auto-loop review remediation allows up to three fix/review cycles after the initial review. A concrete `FIX` or `BLOCKER` finding should continue to a fix worker and fresh reviewer while budget remains; `BLOCKER` alone is not a reason to stop unless resolving it requires human judgment or another explicit safety stop.
 - Use durable repo context: `AGENTS.md`, `CONTEXT.md`, relevant ADRs, relevant directory `AGENTS.md`, and named GitHub issues.
 - Use GitHub Issues when tracker work is needed, with the labels documented in `docs/agents/triage-labels.md` when that file exists; otherwise follow the repo's own tracker/label conventions or recommend `setup-matt-pocock-skills`.
-- Treat GitHub milestones as optional human-facing delivery arcs above specs: they can group multiple spec issues and their descendant tickets, but they do not replace the spec -> child issue hierarchy and are not readiness state.
-- Do not create, assign, or close milestones unless the user explicitly asks or confirms. `/matt-milestone` is status/review-oriented by default, not implementation-oriented.
+- When a Phase involves a GitHub milestone, follow that Phase's pointer to the canonical Milestone reference. Until it is read, never mutate a milestone without explicit user direction or treat membership as hierarchy or readiness.
 - If a phase prompt lists Matt engineering skills that do not fit the task, skip them and briefly say why.
 - Use only skills listed in the current phase prompt or assigned via a skill pack (baseline plus routed skills from an issue-aware skill routing contract, with absolute `SKILL.md` paths). Do not pull in other skills as workflow guidance on your own.
 
@@ -68,18 +67,3 @@ When a prompt includes a routing contract:
 - Do not name skills in commits or issue closeout comments.
 
 When ticket decomposition, include visible `## Agent skill hints` and the machine-readable `matt-agent-skill-hints` JSON comment in child issue bodies. These hints are low-authority diagnostics; auto mode recomputes routing from the final child issue before implementation.
-
-## Milestone delivery arcs
-
-Milestones are for developer orientation and release/delivery tracking. Use them to answer: what larger arc are these specs part of, what remains before this direction can be tied up, and which specs or child issues are still open.
-
-Keep the planning and execution hierarchy intact:
-
-```text
-Milestone = strategic delivery arc
-spec issue = coherent destination / feature proposal
-Child issue = independently agentable tracer-bullet ticket
-Labels = execution/readiness state
-```
-
-When a spec has a milestone, child issues created from that spec may inherit the same milestone for GitHub progress tracking, but the parent spec's `## Child issues` section remains the source of the AFK queue relationship. Shared milestone membership alone is not enough to infer parent/child relationships.

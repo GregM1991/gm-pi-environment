@@ -9,6 +9,11 @@ function withRepo(run: (cwd: string) => void): void {
 	try { run(cwd); } finally { rmSync(cwd, { recursive: true, force: true }); }
 }
 
+async function withRepoAsync(run: (cwd: string) => Promise<void>): Promise<void> {
+	const cwd = mkdtempSync(path.join(tmpdir(), "matt-workflow-test-"));
+	try { await run(cwd); } finally { rmSync(cwd, { recursive: true, force: true }); }
+}
+
 describe("planning phase contracts", () => {
 	test("grill exposes its wrapper and required grilling primitive while refactors retain architecture guidance", () => withRepo((cwd) => {
 		const grill = phasePrompt("grill", "#1", cwd);
@@ -21,20 +26,23 @@ describe("planning phase contracts", () => {
 
 	test("spec uses current upstream skill and preserves local gates", () => withRepo((cwd) => {
 		const prompt = phasePrompt("spec", "#1", cwd);
+		const milestoneReference = path.join(import.meta.dir, "docs", "agents", "milestones.md");
 		expect(prompt).toContain("engineering/to-spec/SKILL.md");
 		expect(prompt).toContain("confirm proposed test seams");
-		expect(prompt).toContain("milestone");
+		expect(prompt).toContain(`If milestone association is requested or considered, read ${milestoneReference} before associating the spec`);
 		expect(prompt).toContain("/matt-refactors");
 		expect(prompt).toContain("/matt-tickets");
 	}));
 
 	test("tickets uses blocking edges, parent-index augmentation, and routing hints", () => withRepo((cwd) => {
 		const prompt = phasePrompt("tickets", "#1", cwd, "Issue-aware skill routing for ticket creation:");
+		const milestoneReference = path.join(import.meta.dir, "docs", "agents", "milestones.md");
 		expect(prompt).toContain("engineering/to-tickets/SKILL.md");
 		expect(prompt).toContain("native blocking relationships");
 		expect(prompt).toContain("generated ## Child issues section");
 		expect(prompt).toContain("MATT-GRILL-NOTES.md");
 		expect(prompt).toContain("Issue-aware skill routing for ticket creation");
+		expect(prompt).toContain(`If the source spec has a milestone or inheritance is considered, read ${milestoneReference} before creating child issues`);
 	}));
 
 	test("wayfinder stays planning-only, preserves HITL, and hands off to spec", () => withRepo((cwd) => {
@@ -76,6 +84,15 @@ describe("Wayfinder automation boundaries", () => {
 		expect(auto).toContain("builtin `reviewer` agent for review children");
 		expect(auto).toContain('context: "fresh"');
 		expect(auto).toContain("not to review, commit, close issues, or launch subagents");
+	}));
+
+	test("auto and closeout point to canonical milestone rules at filtering and reporting branches", () => withRepo((cwd) => {
+		const milestoneReference = path.join(import.meta.dir, "docs", "agents", "milestones.md");
+		const auto = phasePrompt("auto", "current milestone", cwd);
+		const closeout = phasePrompt("closeout", "#42", cwd);
+		expect(auto).toContain(`If the target/filter or selected issue involves a milestone, read ${milestoneReference} before filtering the queue`);
+		expect(auto).not.toContain("fall back to linked issues, shared milestone");
+		expect(closeout).toContain(`If the issue belongs to a milestone or milestone closeout is considered, read ${milestoneReference} before reporting or mutating milestone state`);
 	}));
 
 	test("auto orchestrator waits for running children without polling or mid-child inspection", () => withRepo((cwd) => {
@@ -371,6 +388,45 @@ describe("resource discovery", () => {
 });
 
 describe("command registration", () => {
+	test("status and milestone-review commands point to canonical reporting rules", async () => withRepoAsync(async (cwd) => {
+		type RegisteredCommand = { handler: (args: string, ctx: { cwd: string; ui: { notify: (message: string) => void } }) => Promise<void> };
+		let status: RegisteredCommand | undefined;
+		let milestone: RegisteredCommand | undefined;
+		const messages: string[] = [];
+		mattWorkflowExtension({
+			on() {},
+			appendEntry() {},
+			sendUserMessage(message: string) { messages.push(message); },
+			registerCommand(name: string, command: RegisteredCommand) {
+				if (name === "matt-status") status = command;
+				if (name === "matt-milestone") milestone = command;
+			},
+		} as never);
+
+		await status?.handler("", { cwd, ui: { notify() {} } });
+		await milestone?.handler("current milestone", { cwd, ui: { notify() {} } });
+		const milestoneReference = path.join(import.meta.dir, "docs", "agents", "milestones.md");
+		expect(messages[0]).toContain(`If the status target belongs to a milestone, read ${milestoneReference} before reporting milestone progress`);
+		expect(messages[1]).toContain(`Read ${milestoneReference} before inspecting or reporting this milestone`);
+	}));
+
+	test("keeps detailed milestone policy in the canonical agent reference", () => {
+		const canonical = readFileSync(path.join(import.meta.dir, "docs", "agents", "milestones.md"), "utf8");
+		expect(canonical).toContain("## Conceptual hierarchy");
+		expect(canonical).toContain("## Child issue inheritance");
+		expect(canonical).toContain("## Auto mode");
+		expect(canonical).toContain("## Milestone review");
+		expect(canonical).toContain("## Mutations and closeout");
+
+		for (const relativePath of ["skills/matt-workflow/SKILL.md", "augmentations/status.md", "README.md"]) {
+			const content = readFileSync(path.join(import.meta.dir, relativePath), "utf8");
+			expect(content).not.toContain("Milestone = strategic delivery arc");
+			expect(content).not.toContain("## Child issue inheritance");
+		}
+		const phaseSource = readFileSync(path.join(import.meta.dir, "index.ts"), "utf8");
+		expect(phaseSource).not.toContain("A milestone target/filter is only a queue filter over open ready-for-agent issues");
+	});
+
 	test("registers canonical planning and insight commands", () => {
 		const names: string[] = [];
 		mattWorkflowExtension({ on() {}, registerCommand(name: string) { names.push(name); } } as never);
