@@ -26,7 +26,7 @@
 - Keep extension entry points at `extensions/<name>/index.ts` so the root `pi.extensions` glob continues to discover them.
 - Keep tests colocated as `*.test.ts`; update or add behavior-focused tests when extension behavior changes.
 - Keep skills focused and self-contained. Put reusable instructions in `SKILL.md`, and resolve referenced relative files from the skill directory.
-- Prefer local workflow changes under Matt `augmentations/`; do not hand-edit vendored Matt skills.
+- Put phase-scoped local workflow changes under Matt `augmentations/`; put focused policy shared across steps or phases under `docs/agents/` and reach it through precise prompt pointers. Do not hand-edit vendored Matt skills.
 - Refresh vendored Matt content only through the extension's sync scripts, then inspect `SOURCE.json` and the resulting diff.
 - Record significant, durable architecture changes in `docs/adr/` and update relevant README files when user-facing commands or setup change.
 

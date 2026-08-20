@@ -41,8 +41,12 @@ The scripted refresh (`sync:matt-skills`) that replaces the Vendored Matt Skills
 _Avoid_: manual copy-paste from upstream
 
 **Augmentation**:
-A phase-scoped local policy file layered on top of the Vendored Matt Skills; when an augmentation conflicts with an upstream skill, the augmentation wins. This is the only place local Matt-workflow deltas live.
-_Avoid_: editing vendored skills, forking upstream skills
+A phase-scoped local policy file layered on top of the Vendored Matt Skills; when an Augmentation conflicts with an upstream skill, the Augmentation wins. It owns local behavior that belongs to one Phase or overrides its upstream skill pack.
+_Avoid_: agent reference, editing vendored skills, forking upstream skills
+
+**Agent Reference**:
+A focused authoritative policy document reached through a branch- or step-local pointer when its Job spans Phase steps or clients. It owns reusable mechanics without adding them to every Phase prompt or forcing them into a phase-scoped Augmentation.
+_Avoid_: augmentation, general documentation, orphaned policy
 
 **Variant**:
 A deliberately thin skill that provides an alternative entry point to a Canonical Skill rather than duplicating its job (for example the grilling family).

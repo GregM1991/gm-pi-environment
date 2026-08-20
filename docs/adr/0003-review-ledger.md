@@ -14,7 +14,7 @@ The workflow needs a repo-local artifact that preserves review outcomes across s
 
 Use `.pi/matt-review-ledger.jsonl` as an append-only, repo-local review ledger for `/matt-auto`.
 
-The executable Review Ledger schema Module owns the normative record fields, closed taxonomies, and structural relationship constants, and validation consumes those exports. The append CLI exposes the same contract through non-mutating `--describe` mode, which needs no repository path and never reads, creates, locks, or modifies a ledger. The local [`augmentations/auto.md`](../../extensions/matt-workflow-pi-extension/augmentations/auto.md) file retains semantic capture rules and worked examples without owning a second vocabulary.
+The executable Review Ledger schema Module owns the normative record fields, closed taxonomies, and structural relationship constants, and validation consumes those exports. The append CLI exposes the same contract through non-mutating `--describe` mode, which needs no repository path and never reads, creates, locks, or modifies a ledger. The focused [`auto-review-ledger.md`](../../extensions/matt-workflow-pi-extension/docs/agents/auto-review-ledger.md) reference retains semantic capture rules and worked examples without owning a second vocabulary.
 
 Unversioned records remain valid under the legacy finding and verdict-only PASS shapes: `source` may be omitted and defaults to `review-child`, finding severity remains any non-empty string, and v2-only fields are rejected. Append-only history is never migrated.
 

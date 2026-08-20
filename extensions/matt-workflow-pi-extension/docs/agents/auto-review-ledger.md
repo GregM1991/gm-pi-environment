@@ -1,6 +1,6 @@
-# Matt workflow augmentation: auto review ledger
+# Auto Loop Review Ledger semantics
 
-Semantic rules and examples for the repo-local `.pi/matt-review-ledger.jsonl`, layered on top of the `/matt-auto` phase. Lifecycle rules (when to append, commit placement, and loop-log reporting) live in the auto phase prompt. The executable schema owns record fields, closed taxonomies, and structural relationships; do not copy those lists into agent guidance.
+Read this reference after every Auto Loop review child, for recurring-class handling, and for the optional AI-gate branch. The executable schema owns record fields, closed taxonomies, and structural relationships; this reference owns semantic capture and loop effects without copying those closed lists.
 
 ## Validating append command
 
@@ -12,17 +12,11 @@ The command validates the complete existing ledger plus the candidate record bef
 
 PR-era tagged records are appended atomically as a complete canonical batch through `--batch '<json-array>'`. Batch fields include their stable `runId`/event identities but omit `schemaVersion` and `date`, which the command stamps. The Interface writes nothing unless the whole batch and resulting mixed ledger validate. Canonical order is Review Run Summary, its Findings in `findingIds` order, confirmed Publications, then the final Recap after its referenced run. Do not submit a tagged record through one-record `--record`, because an incomplete tagged run is invalid by design.
 
-## Per-issue review packet
+## Loop lifecycle
 
-Before launching any implementation, fix, or review child for an issue, write a packet outside the worktree at `${TMPDIR:-/tmp}/matt-auto-review-packets/<repo-id>/<issue>.md`. Derive `<repo-id>` from the repository root identity: use the canonical `owner/name` from the normalized `origin` URL when available, otherwise the real absolute worktree path; UTF-8 encode that identity, base64url encode it without padding, and prefix it with `gh-` or `path-` respectively. This is collision-safe and contains only `[A-Za-z0-9_-]`. Create the packet root and repository directory with mode `0700` and each packet with mode `0600` (correct existing modes before use). Never stage or commit this temporary artifact, and exclude it explicitly from dirty-worktree stop handling. Delete the issue packet after successful issue closeout; on every loop termination path, delete all packets created by that run, remove the now-empty `<repo-id>` directory, and remove the packet root if it is empty.
+After every initial or fix-cycle review child returns, append its complete outcome before deciding the next state. Ledger work is expected loop work and does not trigger the dirty-worktree stop rule. Keep `.pi/matt-review-ledger.jsonl` append-only, include its new records in the selected issue's single commit, and never create a ledger-only commit.
 
-The packet contains the fetched issue body and acceptance criteria, parent/spec reference (or `none`), routing contract and selected skill pack, relevant ADR and durable-doc references (or `none found`), and commands/paths for the current diff and compact verification evidence. Update it as evidence changes. Every implementation, fix, and review contract names its absolute path and tells the fresh child to use it as provided context while independently inspecting the actual code and current diff.
-
-## Verification evidence discipline
-
-Implementation and fix children keep complete verification output in `.pi/matt-verification/<issue>-<stage>.log`. The three stage forms are `<issue>-initial.log`, `<issue>-fix-<n>.log` where `<n>` is the fix cycle number, and `<issue>-pre-commit.log`. Before writing logs, ensure `.pi/matt-verification/` is ignored by Git; use the repo-local `.git/info/exclude` when the target repo does not already ignore it. Create the directory with mode `0700` and each log with mode `0600`, correcting existing modes before use. Delete an issue's logs after successful closeout; on every loop termination path, delete all verification logs created by that run and remove the directory if empty. Child handoffs contain only the pass/fail summary, failing cases, and log path—not raw toolchain output. Review children receive that compact evidence and may read the repo-local log on demand.
-
-Use focused tests during intermediate implementation and fix edits. Run the complete repo check once when the implementation pass or fix cycle is complete. That result satisfies the mandatory pre-commit full check if no code or verification-relevant inputs change afterward. Routine review results, ledger appends, compact summary or review-packet updates, and verification-log bookkeeping do not invalidate the completed check: proceed to commit without repeating it. Rerun the complete check immediately before the commit only after actual remediation, code changes, or other verification-relevant input changes, with output redirected to the issue's pre-commit log; never require two identical consecutive full checks.
+After recording an `earlier-issue` repeat, apply **Recurring-class identity** before the next child launch. Inject the resulting `Known recurring pitfalls` precaution, file or reuse the human-triage prevention issue, and stop only when the same class recurs later in the run after injection. The final loop log reports records appended per source and issue, suppressed AI-gate duplicates, every guidance-promotion candidate, its prevention issue, and whether the prevention stop rule fired.
 
 ## Append-only JSONL and versioning
 

@@ -4,6 +4,16 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import mattWorkflowExtension, { isWayfinderPlanningIssue, phasePrompt } from "./index";
 
+type AutoReferenceName = "auto-artifacts" | "auto-child-contracts" | "auto-review-ledger";
+
+function autoReferencePath(name: AutoReferenceName): string {
+	return path.join(import.meta.dir, "docs", "agents", `${name}.md`);
+}
+
+function readAutoReference(name: AutoReferenceName): string {
+	return readFileSync(autoReferencePath(name), "utf8");
+}
+
 function withRepo(run: (cwd: string) => void): void {
 	const cwd = mkdtempSync(path.join(tmpdir(), "matt-workflow-test-"));
 	try { run(cwd); } finally { rmSync(cwd, { recursive: true, force: true }); }
@@ -58,6 +68,44 @@ describe("planning phase contracts", () => {
 });
 
 describe("Wayfinder automation boundaries", () => {
+	test("auto keeps orchestration visible while disclosing mechanics through focused step-local references", () => withRepo((cwd) => {
+		const auto = phasePrompt("auto", "ready-for-agent", cwd);
+		const artifactReference = autoReferencePath("auto-artifacts");
+		const childReference = autoReferencePath("auto-child-contracts");
+		const ledgerReference = autoReferencePath("auto-review-ledger");
+		const artifacts = readAutoReference("auto-artifacts");
+		const children = readAutoReference("auto-child-contracts");
+		const ledger = readAutoReference("auto-review-ledger");
+
+		expect(auto).toContain("Phase: CONTINUOUS AFK AUTO-LOOP");
+		expect(auto).toContain("Loop contract (each iteration, in order)");
+		expect(auto).toContain("Never implement or close a parent/spec/container issue");
+		expect(auto).toContain("at most three fix/review cycles per issue");
+		expect(auto).toContain("10. Run closeout:");
+		expect(auto).toContain("compact loop log");
+		expect(auto.indexOf(artifactReference)).toBeGreaterThan(auto.indexOf("5. Route the selected issue"));
+		expect(auto.indexOf(childReference)).toBeGreaterThan(auto.indexOf("6. Launch a fresh implementation child"));
+		expect(auto.indexOf(ledgerReference)).toBeGreaterThan(auto.indexOf("7. Launch a separate fresh review child"));
+		expect(auto.length).toBeLessThanOrEqual(13_000);
+
+		expect(artifacts).toContain("canonical `owner/name` from the normalized `origin` URL");
+		expect(artifacts).toContain("mode `0700`");
+		expect(artifacts).toContain("mode `0600`");
+		expect(artifacts).toContain("Verification invalidation");
+		expect(artifacts).toContain("On every loop termination path");
+		expect(children).toContain("Implementation child");
+		expect(children).toContain("Fix child");
+		expect(children).toContain("Review child");
+		expect(children).toContain("Agreed Seam");
+		expect(children).toContain("stop and return a human-decision blocker");
+		expect(ledger).toContain("bun run review-ledger:append -- --describe");
+		expect(ledger).toContain("The executable schema owns record fields, closed taxonomies, and structural relationships");
+
+		expect(auto).not.toContain("UTF-8 encode that identity, base64url encode it without padding");
+		expect(auto).not.toContain("Normalize summary and evidence with Unicode NFKC");
+		expect(auto).not.toContain("The three stage forms are `<issue>-initial.log`");
+	}));
+
 	test("unattended review and auto phase packs exclude child-orchestrating architecture guidance", () => withRepo((cwd) => {
 		const review = phasePrompt("review", "#42", cwd);
 		const auto = phasePrompt("auto", "ready-for-agent", cwd);
@@ -75,22 +123,23 @@ describe("Wayfinder automation boundaries", () => {
 	test("AFK and auto prompts exclude maps and decision tickets", () => withRepo((cwd) => {
 		const afk = phasePrompt("afk", "ready-for-agent", cwd);
 		const auto = phasePrompt("auto", "ready-for-agent", cwd);
+		const children = readAutoReference("auto-child-contracts");
 		expect(afk).toContain("wayfinder:map or wayfinder:*");
-		expect(auto).toContain("Re-check Wayfinder classification after every queue refresh");
+		expect(auto).toContain("must be re-checked after every queue refresh");
 		expect(auto).toContain("at most three fix/review cycles per issue");
-		expect(auto).toContain("must continue while fewer than three fix/review cycles have been used");
-		expect(auto).toContain("parent orchestrator exclusively owns review launches");
-		expect(auto).toContain("builtin `worker` agent for implementation and fix children");
-		expect(auto).toContain("builtin `reviewer` agent for review children");
+		expect(auto).toContain("A concrete repo-local FIX or BLOCKER launches a Fix child");
+		expect(auto).toContain("Parent Orchestrator exclusively owns review launches");
+		expect(auto).toContain("builtin `worker` children for implementation/fixes");
+		expect(auto).toContain("builtin `reviewer` children for review");
 		expect(auto).toContain('context: "fresh"');
-		expect(auto).toContain("not to review, commit, close issues, or launch subagents");
+		expect(children).toContain("Review, commit, tracker mutation, and further agent launches remain Parent Orchestrator work");
 	}));
 
 	test("auto and closeout point to canonical milestone rules at filtering and reporting branches", () => withRepo((cwd) => {
 		const milestoneReference = path.join(import.meta.dir, "docs", "agents", "milestones.md");
 		const auto = phasePrompt("auto", "current milestone", cwd);
 		const closeout = phasePrompt("closeout", "#42", cwd);
-		expect(auto).toContain(`If the target/filter or selected issue involves a milestone, read ${milestoneReference} before filtering the queue`);
+		expect(auto).toContain(`If the target/filter or selected issue involves a Milestone, read ${milestoneReference} before filtering or reporting`);
 		expect(auto).not.toContain("fall back to linked issues, shared milestone");
 		expect(closeout).toContain(`If the issue belongs to a milestone or milestone closeout is considered, read ${milestoneReference} before reporting or mutating milestone state`);
 		expect(closeout).not.toContain("its state was reported: complete, still has open specs/child work, or needs human cleanup");
@@ -98,140 +147,104 @@ describe("Wayfinder automation boundaries", () => {
 
 	test("auto orchestrator waits for running children without polling or mid-child inspection", () => withRepo((cwd) => {
 		const auto = phasePrompt("auto", "ready-for-agent", cwd);
-		expect(auto).toContain("Never poll a running child with status/process checks");
-		expect(auto).toContain("inspect git status, diffs, logs, or other repo state while that child is running");
-		expect(auto).toContain("Wait for the child's returned result");
-		expect(auto).toContain("attention notice for a known-long verification command");
-		expect(auto).toContain("continue waiting without taking investigative turns");
-		expect(auto).toContain("unless the harness reports the child failed or stalled");
-		expect(auto).toContain("does not restrict inspection after the child returns");
-		expect(auto).toContain("inspect its diff and verification evidence and append ledger records");
+		expect(auto).toContain("Never poll or inspect repo state while a child is running");
+		expect(auto).toContain("Wait for its returned result");
+		expect(auto).toContain("known-long verification attention notice means keep waiting");
+		expect(auto).toContain("unless the harness reports failure or a stall");
+		expect(auto).toContain("Wait for its diff and compact verification handoff, then inspect the returned diff and evidence");
 	}));
 
 	test("auto prepares an external per-issue packet for every child contract", () => withRepo((cwd) => {
 		const auto = phasePrompt("auto", "ready-for-agent", cwd);
-		expect(auto).toContain("before launching any child for it, prepare its review packet");
-		expect(auto).toContain("${TMPDIR:-/tmp}/matt-auto-review-packets/<repo-id>/<issue>.md");
-		expect(auto).toContain("fetched issue body and acceptance criteria");
-		expect(auto).toContain("parent/spec issue reference");
-		expect(auto).toContain("complete routing contract and selected skill pack");
-		expect(auto).toContain("ADRs, and other durable docs");
-		expect(auto).toContain("commands/paths for finding the current diff");
-		expect(auto).toContain("compact verification summary, failing cases, and verification log path");
-		expect(auto).toContain("absolute review-packet path");
-		expect(auto).toContain("read the packet as provided context");
-		expect(auto).toContain("independently inspect the actual code and current diff");
-		expect(auto).toContain("fix worker");
-		expect(auto).toContain("same packet and independent-inspection requirements");
-		expect(auto).toContain("collision-safe sanitized `<repo-id>`");
-		expect(auto).toContain("directories with mode 0700 and packet files with mode 0600");
-		expect(auto).toContain("Delete the issue packet after closeout");
-		expect(auto).toContain("all packets created by this run whenever the loop terminates");
-		expect(auto).toContain("Never stage or commit them");
-		expect(auto).toContain("explicitly excluded from the dirty-worktree stop rule");
-		expect(auto).toContain("Ignore the external per-issue review packet entirely");
+		const artifactReference = autoReferencePath("auto-artifacts");
+		const childReference = autoReferencePath("auto-child-contracts");
+		const artifacts = readAutoReference("auto-artifacts");
+		const children = readAutoReference("auto-child-contracts");
 
-		const augmentation = readFileSync(path.join(import.meta.dir, "augmentations", "auto.md"), "utf8");
-		expect(augmentation).toContain("canonical `owner/name` from the normalized `origin` URL");
-		expect(augmentation).toContain("UTF-8 encode that identity, base64url encode it without padding");
-		expect(augmentation).toContain("prefix it with `gh-` or `path-` respectively");
-		expect(augmentation).toContain("remove the now-empty `<repo-id>` directory, and remove the packet root if it is empty");
+		expect(auto).toContain(`Read ${artifactReference} now, then create its private review packet`);
+		expect(auto).toContain(`Read ${childReference} now`);
+		expect(artifacts).toContain("${TMPDIR:-/tmp}/matt-auto-review-packets/<repo-id>/<issue>.md");
+		expect(artifacts).toContain("the fetched issue body and acceptance criteria");
+		expect(artifacts).toContain("the parent/spec reference");
+		expect(artifacts).toContain("the routing contract and selected skill pack");
+		expect(artifacts).toContain("relevant `AGENTS.md`, `CONTEXT.md`, ADR, and durable-document references");
+		expect(artifacts).toContain("commands and paths for the current diff");
+		expect(artifacts).toContain("compact verification summary, failing cases, and verification log path");
+		expect(children).toContain("Supply the absolute per-issue review-packet path");
+		expect(children).toContain("independently inspects the issue, actual code, and current diff");
+		expect(artifacts).toContain("canonical `owner/name` from the normalized `origin` URL");
+		expect(artifacts).toContain("UTF-8 encode that identity, base64url encode it without padding");
+		expect(artifacts).toContain("prefix it with `gh-` or `path-` respectively");
+		expect(artifacts).toContain("mode `0700`");
+		expect(artifacts).toContain("mode `0600`");
+		expect(artifacts).toContain("never stage or commit it");
+		expect(artifacts).toContain("exclude it from dirty-worktree handling");
+		expect(artifacts).toContain("On every loop termination path");
 	}));
 
 	test("auto worker and fix contracts keep full verification logs out of handoffs", () => withRepo((cwd) => {
 		const auto = phasePrompt("auto", "ready-for-agent", cwd);
-		expect(auto).toContain("`.pi/matt-verification/<issue>-<stage>.log`");
-		expect(auto).toContain("the three stage forms are `<issue>-initial.log`, `<issue>-fix-<n>.log` where `<n>` is the fix cycle number, and `<issue>-pre-commit.log`");
-		expect(auto).toContain("repo-local `.git/info/exclude`");
-		expect(auto).toContain("focused tests while editing");
-		expect(auto).toContain("`.pi/matt-verification/<issue>-initial.log`");
-		expect(auto).toContain("only the verification pass/fail summary, failing cases, and log path");
-		expect(auto).toContain("permit it to read that repo-local log on demand");
-		expect(auto).toContain("focused tests during intermediate edits");
-		expect(auto).toContain("one complete repo check after that fix cycle is complete");
-		expect(auto).toContain("`.pi/matt-verification/<issue>-fix-<n>.log`, where `<n>` is the fix cycle number");
-		expect(auto).toContain("mandatory pre-commit check when neither changed afterward");
-		expect(auto).toContain("`.pi/matt-verification/<issue>-pre-commit.log`");
-		expect(auto).toContain("Create `.pi/matt-verification/` with mode 0700 and log files with mode 0600");
-		expect(auto).toContain("Delete that issue's logs after closeout");
-		expect(auto).toContain("delete all verification logs created by this run whenever the loop terminates");
-		expect(auto).not.toContain("mandatory even when the completed implementation or fix cycle already ran the same check");
+		const artifactReference = autoReferencePath("auto-artifacts");
+		const artifacts = readAutoReference("auto-artifacts");
+		const children = readAutoReference("auto-child-contracts");
 
-		const augmentation = readFileSync(path.join(import.meta.dir, "augmentations", "auto.md"), "utf8");
-		expect(augmentation).toContain("`.pi/matt-verification/<issue>-<stage>.log`");
-		expect(augmentation).toContain("The three stage forms are `<issue>-initial.log`, `<issue>-fix-<n>.log` where `<n>` is the fix cycle number, and `<issue>-pre-commit.log`");
+		expect(auto).toContain(`use the verification-invalidation rules in ${artifactReference}`);
+		expect(artifacts).toContain("`.pi/matt-verification/<issue>-<stage>.log`");
+		expect(artifacts).toContain("`<issue>-initial.log`, `<issue>-fix-<n>.log`, and `<issue>-pre-commit.log`");
+		expect(artifacts).toContain("repo-local `.git/info/exclude`");
+		expect(artifacts).toContain("mode `0700`");
+		expect(artifacts).toContain("mode `0600`");
+		expect(artifacts).toContain("pass/fail summary, failing cases, and log path");
+		expect(children).toContain("Use focused tests while editing");
+		expect(children).toContain("run one complete repo check");
+		expect(children).toContain("The handoff contains no raw verification output");
+		expect(artifacts).toContain("After successful issue closeout, delete that issue's packet and logs");
+		expect(artifacts).toContain("On every loop termination path");
 	}));
 
 	test("auto sequences a completed full check through review bookkeeping to commit without duplication", () => withRepo((cwd) => {
 		const auto = phasePrompt("auto", "ready-for-agent", cwd);
-		const fullCheck = auto.indexOf("run the complete repo check once when the implementation pass is complete");
-		const reviewAppend = auto.indexOf("After every review child returns");
-		const noDuplicate = auto.indexOf("routine review result, ledger append, compact summary or review-packet update");
-		const commit = auto.indexOf("Create the commit for that issue only if the check passes");
-		expect(fullCheck).toBeGreaterThan(-1);
-		expect(fullCheck).toBeLessThan(reviewAppend);
-		expect(reviewAppend).toBeLessThan(noDuplicate);
-		expect(noDuplicate).toBeLessThan(commit);
-		expect(auto).toContain("proceed directly to commit");
-		expect(auto).toContain("Rerun the complete check immediately before committing only after actual remediation, code changes, or other verification-relevant input changes");
-		expect(auto).toContain("If the complete pre-commit check fails, re-enter the fix/review cycle while fewer than three cycles have been used");
-		expect(auto).toContain("otherwise stop with the budget-exhausted reason");
-		expect(auto).toContain("Never commit on a failing check");
+		const artifacts = readAutoReference("auto-artifacts");
+		const implementation = auto.indexOf("6. Launch a fresh implementation child");
+		const review = auto.indexOf("7. Launch a separate fresh review child");
+		const commit = auto.indexOf("9. After review passes");
+		expect(implementation).toBeGreaterThan(-1);
+		expect(implementation).toBeLessThan(review);
+		expect(review).toBeLessThan(commit);
+		expect(auto).toContain("Rerun only when invalidated");
+		expect(auto).toContain("never commit on a failing check");
+		expect(auto).toContain("A failed rerun re-enters the fix/review cycle while budget remains");
+		expect(auto).toContain("otherwise stop as budget exhausted");
+		expect(artifacts).toContain("That check remains valid for pre-commit while code and verification-relevant inputs are unchanged");
+		expect(artifacts).toContain("Review results, ledger appends, compact summaries, packet updates, and log bookkeeping do not invalidate it");
+		expect(artifacts).toContain("Never require two identical consecutive complete checks");
 	}));
 
-	test("auto prompt carries the append-only review ledger lifecycle contract", () => withRepo((cwd) => {
+	test("auto prompt points to the append-only Review Ledger lifecycle owner", () => withRepo((cwd) => {
 		const auto = phasePrompt("auto", "ready-for-agent", cwd);
-		expect(auto).toContain("augmentations/auto.md");
-		expect(auto).toContain(".pi/matt-review-ledger.jsonl");
-		expect(auto).toContain("append-only");
-		expect(auto).toContain("schema's generated `--describe` output for closed fields, taxonomies, and relationships");
-		expect(auto).toContain("semantic capture rules and append command in `augmentations/auto.md`");
-		expect(auto).not.toContain("augmentation's closed category taxonomy");
-		expect(auto).toContain("Append every new ledger record only through the validating command");
-		expect(auto).toContain("Treat a rejected append as a hard stop");
-		expect(auto).not.toContain("Require file:line findings, severity, one-line summaries");
-		expect(auto).toContain('source: `review-child`');
-		expect(auto).toContain("same issue commit");
-		expect(auto).toContain("ledger records appended per source per issue");
-		expect(auto).toContain("`repeat: earlier-issue`");
-		expect(auto).toContain("`Known recurring pitfalls`");
-		expect(auto).toContain("every remaining implementation and fix-child contract");
-		expect(auto).toContain("prompt-only; change no file");
-		expect(auto).toContain("file exactly one human-triage prevention issue");
-		expect(auto).toContain("issue, cycle, category, and `whyMissed`");
-		expect(auto).toContain("existing open prevention issue");
-		expect(auto).toContain("target-repo `AGENTS.md` guidance, a routed skill, or, strongest, a deterministic toolchain check");
-		expect(auto).toContain("never apply any durable guidance, skill, routing, or test-policy change");
-		expect(auto).toContain("A first `earlier-issue` repeat only injects and schedules prevention; it never stops the loop");
-		expect(auto).toContain("First compare it by judgment against recurring classes already recorded this run");
-		expect(auto).toContain("assign it to that class and reuse the class's key");
-		expect(auto).toContain("Only for a genuinely new recurring class derive a fresh key with the unchanged normalization");
-		expect(auto).toContain("Use the assigned canonical key verbatim for pitfall injection and the stop rule");
-		expect(auto).toContain("embed it verbatim in and search for it in prevention issue bodies");
-		expect(auto).toContain("after that class's pitfall note was injected");
+		const ledgerReference = autoReferencePath("auto-review-ledger");
+		const ledger = readAutoReference("auto-review-ledger");
+
+		expect(auto).toContain(ledgerReference);
+		expect(auto).toContain("complete its validating append, recurrence, prevention, and stop-rule mechanics");
+		expect(auto).toContain("Review Ledger appends in the same commit");
+		expect(auto).toContain("Review Ledger records appended per source and issue");
 		expect(auto).toContain("`Guidance-promotion candidates`");
-		expect(auto).toContain("If there are no candidates, this section states `none`");
-		expect(auto).toContain("issue/cycle ledger references, prevention issues filed or reused");
-		expect(auto).toContain("whether the prevention stop rule fired");
-
-		const augmentation = readFileSync(path.join(import.meta.dir, "augmentations", "auto.md"), "utf8");
-		expect(augmentation).toContain("bun run review-ledger:append");
-		expect(augmentation).toContain("--repo-root <target-repo-root>");
-		expect(augmentation).toContain("generates the run UUID");
-		expect(augmentation).toContain("never work around it by writing, echoing, or editing a JSONL line directly");
-		expect(augmentation).toContain("Unversioned records are legacy");
-		expect(augmentation).toContain("Every newly appended record uses `schemaVersion: 2`");
-		expect(augmentation).toContain("`repeatsFindingId`");
-		expect(augmentation).toContain("`repeatsLegacyLine`");
-		expect(augmentation).not.toContain("reviewedCommitSha");
-		expect(augmentation).toContain("## Recurring-class identity");
-		expect(augmentation).toContain("first compare it by judgment against the recurring classes already recorded in the current run");
-		expect(augmentation).toContain("persist the class's existing key in `recurringClassKey`");
-		expect(augmentation).toContain("Only a genuinely new recurring class derives a fresh deterministic key");
-		expect(augmentation).toContain("join category and normalized summary as `<category>|<summary>`");
-		expect(augmentation).toContain("embed and search for it verbatim in the prevention issue body");
+		expect(ledger).toContain("bun run review-ledger:append -- --describe");
+		expect(ledger).toContain("--repo-root <target-repo-root>");
+		expect(ledger).toContain("never work around it by writing, echoing, or editing a JSONL line directly");
+		expect(ledger).toContain("Unversioned records are legacy");
+		expect(ledger).toContain("Every newly appended record uses `schemaVersion: 2`");
+		expect(ledger).toContain("`repeatsFindingId`");
+		expect(ledger).toContain("`repeatsLegacyLine`");
+		expect(ledger).not.toContain("reviewedCommitSha");
+		expect(ledger).toContain("## Recurring-class identity");
+		expect(ledger).toContain("persist the class's existing key in `recurringClassKey`");
+		expect(ledger).toContain("Only a genuinely new recurring class derives a fresh deterministic key");
+		expect(ledger).toContain("embed and search for it verbatim in the prevention issue body");
+		expect(ledger).toContain("file or reuse the human-triage prevention issue");
+		expect(ledger).toContain("stop only when the same class recurs later in the run after injection");
 	}));
-
 	test("configured AI gate has a separate source-tagged ledger lifecycle", () => withRepo((cwd) => {
 		mkdirSync(path.join(cwd, ".pi"), { recursive: true });
 		writeFileSync(path.join(cwd, ".pi", "matt-conventions.json"), JSON.stringify({
@@ -240,66 +253,38 @@ describe("Wayfinder automation boundaries", () => {
 		}));
 
 		const auto = phasePrompt("auto", "ready-for-agent", cwd);
-		expect(auto).toContain("After the issue's review passes and its commit exists, run the configured AI gate exactly once for that issue, before closeout");
-		expect(auto).toContain("Do not run it after review children");
-		expect(auto).not.toContain("After every review child returns, run the configured AI gate");
-		expect(auto).toContain('source: `ai-gate`');
-		expect(auto).toContain("no findings → `PASS`");
-		expect(auto).toContain("actionable must-fix or should-fix findings → `FIX`");
-		expect(auto).toContain("execution/parsing failure or non-remediable blocking result → `BLOCKER`");
-		expect(auto).toContain("blocking `verification-skipped` finding");
-		expect(auto).toContain("that issue's review children");
-		expect(auto).toContain("normalized location plus summary/evidence");
-		expect(auto).toContain("triggers a fix worker and fresh review while fewer than three fix/review cycles have been used");
-		expect(auto).toContain("Classify each novel gate finding's repeat value under the unchanged finding-record rules");
-		expect(auto).toContain("Any novel gate finding classified `repeat: earlier-issue` enters exactly the same recurring-class machinery as a review-child finding");
-		expect(auto).toContain("match it by judgment to recurring classes already recorded this run and reuse a matching class's canonical key");
-		expect(auto).toContain("derive a fresh key under `augmentations/auto.md` only for a genuinely new class");
-		expect(auto).toContain("inject the pitfall note into every remaining implementation and fix-child contract");
-		expect(auto).toContain("file or reuse the prevention issue, and count it toward the prevention stop rule");
-		expect(auto).toContain("after all three fix/review cycles have been consumed, stop with the budget-exhausted reason and do not close the issue");
-		expect(auto).toContain("fix worker's completed full repo check satisfies the mandatory post-remediation/pre-commit verification requirement");
-		expect(auto).toContain("fresh review and ledger bookkeeping do not invalidate it");
-		expect(auto).toContain("do not require a second identical complete check before updating the issue commit");
-		expect(auto).toContain("Do not run the gate again");
-		expect(auto).toContain("Update the existing issue commit to include the appended gate ledger evidence");
-		expect(auto).toContain("active implementation/fix worker skill pack");
-		expect(auto).toContain("Resolve every gate location to `file:line`");
-		const commit = auto.indexOf("Create the commit for that issue");
-		const gate = auto.indexOf("run the configured AI gate exactly once");
-		const fixCheck = auto.indexOf("fix worker's completed full repo check");
-		const updateCommit = auto.indexOf("updating the issue commit");
-		const closeout = auto.indexOf("Run closeout logic for that issue");
+		const ledgerReference = autoReferencePath("auto-review-ledger");
+		const ledger = readAutoReference("auto-review-ledger");
+		const artifacts = readAutoReference("auto-artifacts");
+		const commit = auto.indexOf("9. After review passes");
+		const gate = auto.indexOf("9a. Before closeout");
+		const closeout = auto.indexOf("10. Run closeout:");
+
+		expect(auto).toContain(`read ${ledgerReference}, then run the configured AI gate exactly once for this issue after its commit exists`);
+		expect(auto).toContain("Append its source-tagged outcome and update the same issue commit");
+		expect(auto).toContain("FIX or a concrete remediable BLOCKER enters a fix-worker plus fresh-review cycle while budget remains");
+		expect(auto).toContain("never rerun the gate");
+		expect(auto).toContain("exhausted three-cycle budget stops without closing");
 		expect(commit).toBeGreaterThan(-1);
-		expect(gate).toBeGreaterThan(-1);
-		expect(fixCheck).toBeGreaterThan(-1);
-		expect(updateCommit).toBeGreaterThan(-1);
-		expect(closeout).toBeGreaterThan(-1);
 		expect(commit).toBeLessThan(gate);
-		expect(gate).toBeLessThan(fixCheck);
-		expect(fixCheck).toBeLessThan(updateCommit);
 		expect(gate).toBeLessThan(closeout);
 
-		const augmentation = readFileSync(path.join(import.meta.dir, "augmentations", "auto.md"), "utf8");
-		expect(augmentation).toContain("run it exactly once per issue");
-		expect(augmentation).toContain("after the issue's review has passed and its commit exists, but before closeout");
-		expect(augmentation).toContain("Do not run it after review children");
-		expect(augmentation).toContain("any review child for that issue");
-		expect(augmentation).toContain("committed issue diff");
-		expect(augmentation).toContain("Classify each novel gate finding's `repeat` value under the v2 finding-record rules");
-		expect(augmentation).toContain("Any novel AI-gate finding classified `repeat: \"earlier-issue\"` enters exactly the same recurring-class machinery as a review-child finding");
-		expect(augmentation).toContain("assign its recurring class and key under **Recurring-class identity**");
-		expect(augmentation).toContain("inject the pitfall note into all remaining implementation and fix-child contracts");
-		expect(augmentation).toContain("file or reuse the prevention issue, and count it toward the prevention stop rule");
-		expect(augmentation).toContain("triggers a fix worker and fresh review while fewer than three fix/review cycles have been used");
-		expect(augmentation).toContain("If all three cycles have already been consumed, stop with the budget-exhausted reason and do not close the issue");
-		expect(augmentation).toContain("fix worker's completed full check satisfies the mandatory post-remediation/pre-commit verification requirement");
-		expect(augmentation).toContain("fresh review and ledger bookkeeping do not invalidate it");
-		expect(augmentation).toContain("do not require a second identical complete check before updating the issue commit");
-		expect(augmentation).toContain("Do not run the gate again after that review");
-		expect(augmentation).not.toContain("run it after every review child");
+		expect(ledger).toContain("run it exactly once per issue");
+		expect(ledger).toContain("after the issue's review has passed and its commit exists, but before closeout");
+		expect(ledger).toContain("Do not run it after review children");
+		expect(ledger).toContain('source: "ai-gate"');
+		expect(ledger).toContain("no findings → `PASS`");
+		expect(ledger).toContain("actionable must-fix or should-fix findings → `FIX`");
+		expect(ledger).toContain("execution/parsing failure or a non-remediable blocking result → `BLOCKER`");
+		expect(ledger).toContain("committed issue diff");
+		expect(ledger).toContain("Classify each novel gate finding's `repeat` value under the v2 finding-record rules");
+		expect(ledger).toContain('Any novel AI-gate finding classified `repeat: "earlier-issue"` enters exactly the same recurring-class machinery');
+		expect(ledger).toContain("triggers a fix worker and fresh review while fewer than three fix/review cycles have been used");
+		expect(ledger).toContain("If all three cycles have already been consumed, stop with the budget-exhausted reason");
+		expect(ledger).toContain("Do not run the gate again after that review");
+		expect(ledger).toContain("Normalize summary and evidence with Unicode NFKC");
+		expect(artifacts).toContain("Review results, ledger appends, compact summaries, packet updates, and log bookkeeping do not invalidate it");
 	}));
-
 	test("fresh review keeps its configured AI gate behavior", () => withRepo((cwd) => {
 		mkdirSync(path.join(cwd, ".pi"), { recursive: true });
 		writeFileSync(path.join(cwd, ".pi", "matt-conventions.json"), JSON.stringify({
@@ -314,8 +299,8 @@ describe("Wayfinder automation boundaries", () => {
 	}));
 
 	test("v2 verdict-only PASS records include run identity and worker provenance but omit finding fields", () => {
-		const augmentation = readFileSync(path.join(import.meta.dir, "augmentations", "auto.md"), "utf8");
-		const passSection = augmentation.split("## V2 verdict-only PASS record")[1] ?? "";
+		const ledger = readAutoReference("auto-review-ledger");
+		const passSection = ledger.split("## V2 verdict-only PASS record")[1] ?? "";
 		const example = passSection.match(/```json\n(.+)\n```/)?.[1];
 
 		expect(passSection).toContain("`workerSkillPack` is required");
@@ -337,7 +322,7 @@ describe("Wayfinder automation boundaries", () => {
 describe("retro phase contract", () => {
 	test("requires validated evidence, distinct repeat signals, and per-proposal approval", () => withRepo((cwd) => {
 		const prompt = phasePrompt("retro", "", cwd);
-		expect(prompt).toContain(`- auto: ${path.join(import.meta.dir, "augmentations", "auto.md")} —`);
+		expect(prompt).toContain(`schema-generated contract and semantics in ${autoReferencePath("auto-review-ledger")}`);
 		expect(prompt).toContain("augmentations/retro.md");
 		expect(prompt).toContain(".pi/matt-review-ledger.jsonl");
 		expect(prompt).toContain("missing, empty, or malformed");
