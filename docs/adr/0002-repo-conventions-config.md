@@ -12,7 +12,7 @@ Repos need a durable, repo-agnostic way to state these conventions explicitly wi
 
 ## Decision
 
-Add a sibling config file at `.pi/matt-conventions.json` with required `version: 1` or `version: 2`.
+Add a sibling config file at `.pi/matt-conventions.json` with required `version: 1`, `version: 2`, or `version: 3`.
 
 The file describes repo conventions rather than extension routing behavior. It sits next to `.pi/matt-skill-routes.json` but has an independent schema.
 
@@ -27,22 +27,30 @@ Version 2 adds delivery policy without changing the existing sections' fallback 
 - `tracker.requiredChecks`: a required, non-empty, duplicate-free list whenever the v2 tracker section is configured.
 - `architecture.recapPrimitivesPath`: an optional reference to the owner-curated recap-primitive map.
 
+Version 3 retains version 2 delivery policy and changes only `docs.extraContextDocs`. Each entry is a strict object with exactly two required fields:
+
+- `path`: a repo-relative path to an existing document.
+- `useWhen`: a non-empty description of the workflow branch that requires reading the document.
+
+Versions 1 and 2 continue to accept string arrays and keep their existing hint text exactly. Version 3 rejects legacy string entries so branch requirements cannot silently disappear during migration.
+
 Load semantics:
 
 - No config file: use current per-section detection fallback. This is never an error.
 - Config file exists and is valid: explicit section values win. Omitted sections fall back to detection for that section only.
 - Config file exists and is invalid: hard stop every command that injects `baseContext()`. The extension notifies formatted diagnostics and does not send the phase prompt.
 
-Validation is strict: JSON parsing, version checking, unknown-field rejection at every level, supported enum values, required-check list validation, and repo-relative doc path checks. Referenced docs, including a configured recap-primitive map, must exist on disk.
+Validation is strict: JSON parsing, version checking, unknown-field rejection at every level, supported enum values, required-check list validation, branch-trigger validation, and repo-relative doc path checks. Referenced docs, including extra context documents and a configured recap-primitive map, must exist on disk.
 
-Delivery callers resolve required-check policy through the configuration Module's public Interface. Native GitHub required policy takes precedence when available. Otherwise v2 `tracker.requiredChecks` is authoritative. If neither exists, resolution returns an explicit hard-stop result; callers must not infer policy from observed checks. Version 1 repositories continue to load normally, but do not supply configured delivery policy.
+Delivery callers resolve required-check policy through the configuration Module's public Interface. Native GitHub required policy takes precedence when available. Otherwise version 2 or version 3 `tracker.requiredChecks` is authoritative. If neither exists, resolution returns an explicit hard-stop result; callers must not infer policy from observed checks. Version 1 repositories continue to load normally, but do not supply configured delivery policy.
 
 ## Consequences
 
 Positive:
 
 - Repos can record conventions and delivery policy explicitly and portably.
-- Existing version 1 repositories retain their current load and per-section fallback behavior.
+- Existing version 1 and version 2 repositories retain their current load, hint formatting, and per-section fallback behavior.
+- Version 3 hints tell agents both which additional document to read and which workflow branch requires it.
 - Skill routing can evolve separately from conventions.
 - A broken conventions file fails loudly instead of silently sending wrong prompts.
 - Partial config stays ergonomic because omitted sections keep existing detection behavior.

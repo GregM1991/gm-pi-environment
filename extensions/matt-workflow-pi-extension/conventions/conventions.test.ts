@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { buildConventionsContext, resolveRequiredCheckPolicy, scaffoldConventionsJson } from "./config";
-import { docsHint, toolchainHint, trackerHint } from "./hints";
+import { docsHint, formatConventionsHints, toolchainHint, trackerHint } from "./hints";
 
 let repoRoot = "";
 
@@ -49,7 +49,7 @@ describe("repo conventions config", () => {
 		expect(buildConventionsContext(repoRoot).validation.diagnostics.map((item) => item.code)).toContain("invalid-json");
 		write("docs/agents/triage-labels.md");
 		write("docs/agents/workflow.md");
-		writeConfig({ version: 3, extra: true, tracker: { type: "linear", labelsDocPath: "docs/agents/triage-labels.md", extra: true }, toolchain: { runtime: "bun", extra: true, commands: { test: "bun test", lint: "bun lint" } }, docs: { workflowDocPath: "docs/agents/workflow.md", extra: true } });
+		writeConfig({ version: 4, extra: true, tracker: { type: "linear", labelsDocPath: "docs/agents/triage-labels.md", extra: true }, toolchain: { runtime: "bun", extra: true, commands: { test: "bun test", lint: "bun lint" } }, docs: { workflowDocPath: "docs/agents/workflow.md", extra: true } });
 		let codes = buildConventionsContext(repoRoot).validation.diagnostics.map((item) => item.code);
 		expect(codes).toContain("invalid-version");
 		writeConfig({ version: 2, extra: true, tracker: { type: "linear", labelsDocPath: "docs/agents/triage-labels.md", extra: true }, toolchain: { runtime: "bun", extra: true, commands: { test: "bun test", lint: "bun lint" } }, docs: { workflowDocPath: "docs/agents/workflow.md", extra: true } });
@@ -104,6 +104,101 @@ describe("repo conventions config", () => {
 		expect(trackerHint(context, repoRoot)).toContain("docs/custom-labels.md");
 		expect(toolchainHint(context, repoRoot)).toBe("This repo is Bun-first. Use Bun commands from `AGENTS.md`.");
 		expect(docsHint(context, repoRoot)).toBe("No expanded repo-local workflow doc was detected; rely on the phase engineering-skill references below.");
+	});
+
+	test("loads version 3 branch-scoped context docs and tells agents when to read them", () => {
+		write("docs/workflow.md");
+		write("docs/security.md");
+		write("docs/release.md");
+		writeConfig({
+			version: 3,
+			docs: {
+				workflowDocPath: "docs/workflow.md",
+				extraContextDocs: [
+					{ path: "docs/security.md", useWhen: "reviewing authentication changes" },
+					{ path: "docs/release.md", useWhen: "preparing closeout" },
+				],
+			},
+		});
+
+		const context = buildConventionsContext(repoRoot);
+		expect(context.validation.ok).toBe(true);
+		expect(context.config).toEqual({
+			version: 3,
+			docs: {
+				workflowDocPath: "docs/workflow.md",
+				extraContextDocs: [
+					{ path: "docs/security.md", useWhen: "reviewing authentication changes" },
+					{ path: "docs/release.md", useWhen: "preparing closeout" },
+				],
+			},
+		});
+		expect(formatConventionsHints(context, repoRoot)[2]).toBe(
+			"There is an expanded repo-local workflow doc at `docs/workflow.md`; consult it only when phase guidance is insufficient. Additional context docs: read `docs/security.md` when reviewing authentication changes; read `docs/release.md` when preparing closeout.",
+		);
+	});
+
+	test("rejects malformed version 3 context entries without accepting legacy strings", () => {
+		write("docs/workflow.md");
+		write("docs/context.md");
+		writeConfig({
+			version: 3,
+			docs: {
+				workflowDocPath: "docs/workflow.md",
+				extraContextDocs: [
+					"docs/context.md",
+					{ path: "docs/context.md" },
+					{ path: "docs/context.md", useWhen: "   ", extra: true },
+					{ path: "docs/missing.md", useWhen: "running a review" },
+					{ path: "../outside.md", useWhen: "preparing a release" },
+				],
+			},
+		});
+
+		const diagnostics = buildConventionsContext(repoRoot).validation.diagnostics;
+		expect(diagnostics).toContainEqual(expect.objectContaining({ code: "invalid-extra-context-doc", path: "docs.extraContextDocs[0]" }));
+		expect(diagnostics).toContainEqual(expect.objectContaining({ code: "invalid-use-when", path: "docs.extraContextDocs[1].useWhen" }));
+		expect(diagnostics).toContainEqual(expect.objectContaining({ code: "invalid-use-when", path: "docs.extraContextDocs[2].useWhen" }));
+		expect(diagnostics).toContainEqual(expect.objectContaining({ code: "unknown-config-field", path: "docs.extraContextDocs[2].extra" }));
+		expect(diagnostics).toContainEqual(expect.objectContaining({ code: "missing-doc", path: "docs.extraContextDocs[3].path" }));
+		expect(diagnostics).toContainEqual(expect.objectContaining({ code: "invalid-doc-path", path: "docs.extraContextDocs[4].path" }));
+	});
+
+	test("preserves version 1 and version 2 extra-context hint formatting", () => {
+		write("docs/workflow.md");
+		write("docs/context.md");
+		writeConfig({ version: 1, docs: { workflowDocPath: "docs/workflow.md", extraContextDocs: ["docs/context.md"] } });
+		const version1Hint = docsHint(buildConventionsContext(repoRoot), repoRoot);
+
+		writeConfig({ version: 2, docs: { workflowDocPath: "docs/workflow.md", extraContextDocs: ["docs/context.md"] } });
+		const version2Hint = docsHint(buildConventionsContext(repoRoot), repoRoot);
+
+		const legacyHint = "There is an expanded repo-local workflow doc at `docs/workflow.md`; consult it only when phase guidance is insufficient. Additional context docs: `docs/context.md`.";
+		expect(version1Hint).toBe(legacyHint);
+		expect(version2Hint).toBe(legacyHint);
+	});
+
+	test("version 3 retains version 2 delivery policy and architecture fields", () => {
+		write("docs/labels.md");
+		write("docs/recap.yaml");
+		writeConfig({
+			version: 3,
+			tracker: { type: "github-issues", labelsDocPath: "docs/labels.md", requiredChecks: ["configured/check"] },
+			architecture: { recapPrimitivesPath: "docs/recap.yaml" },
+		});
+
+		const context = buildConventionsContext(repoRoot);
+		expect(context.validation.ok).toBe(true);
+		expect(resolveRequiredCheckPolicy(context)).toEqual({
+			status: "resolved",
+			source: "configured",
+			requiredChecks: ["configured/check"],
+		});
+		expect(context.config).toEqual({
+			version: 3,
+			tracker: { type: "github-issues", labelsDocPath: "docs/labels.md", requiredChecks: ["configured/check"] },
+			architecture: { recapPrimitivesPath: "docs/recap.yaml" },
+		});
 	});
 
 	test("rejects malformed version 2 delivery policy and recap references", () => {
@@ -199,7 +294,7 @@ describe("repo conventions config", () => {
 		expect(resolveRequiredCheckPolicy(buildConventionsContext(repoRoot))).toEqual({
 			status: "hard-stop",
 			reason: "missing-required-check-policy",
-			message: "Delivery requires native GitHub required-check policy or tracker.requiredChecks in repo conventions version 2.",
+			message: "Delivery requires native GitHub required-check policy or tracker.requiredChecks in repo conventions version 2 or version 3.",
 		});
 	});
 

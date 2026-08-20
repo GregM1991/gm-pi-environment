@@ -20,6 +20,16 @@ export type RepoConventionsDocs = {
 	extraContextDocs?: string[];
 };
 
+export type BranchScopedContextDoc = {
+	path: string;
+	useWhen: string;
+};
+
+export type RepoConventionsDocsV3 = {
+	workflowDocPath: string;
+	extraContextDocs?: BranchScopedContextDoc[];
+};
+
 export type RepoConventionsConfigV1 = {
 	version: 1;
 	tracker?: RepoConventionsTrackerV1;
@@ -39,7 +49,15 @@ export type RepoConventionsConfigV2 = {
 	};
 };
 
-export type RepoConventionsConfig = RepoConventionsConfigV1 | RepoConventionsConfigV2;
+export type RepoConventionsConfigV3 = {
+	version: 3;
+	tracker?: RepoConventionsConfigV2["tracker"];
+	toolchain?: RepoConventionsToolchain;
+	docs?: RepoConventionsDocsV3;
+	architecture?: RepoConventionsConfigV2["architecture"];
+};
+
+export type RepoConventionsConfig = RepoConventionsConfigV1 | RepoConventionsConfigV2 | RepoConventionsConfigV3;
 
 export type RequiredCheckPolicy =
 	| { status: "resolved"; source: "github" | "configured"; requiredChecks: string[] }

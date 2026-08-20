@@ -6,6 +6,7 @@ import type {
 	RepoConventionsConfig,
 	RepoConventionsConfigV1,
 	RepoConventionsConfigV2,
+	RepoConventionsConfigV3,
 	RequiredCheckPolicy,
 } from "./types";
 
@@ -16,6 +17,7 @@ const TRACKER_KEYS_V2 = new Set([...TRACKER_KEYS_V1, "requiredChecks"]);
 const TOOLCHAIN_KEYS = new Set(["runtime", "commands"]);
 const COMMAND_KEYS = new Set(["test", "check", "build", "aiGate"]);
 const DOCS_KEYS = new Set(["workflowDocPath", "extraContextDocs"]);
+const EXTRA_CONTEXT_DOC_KEYS_V3 = new Set(["path", "useWhen"]);
 const ARCHITECTURE_KEYS = new Set(["recapPrimitivesPath"]);
 
 const diagnostic = (code: string, message: string, pathName?: string): ValidationDiagnostic => ({
@@ -143,6 +145,37 @@ function validateDocs(repoRoot: string, value: unknown, errors: ValidationDiagno
 	return workflowDocPath ? { workflowDocPath, ...(extraContextDocs ? { extraContextDocs } : {}) } : undefined;
 }
 
+function validateDocsV3(repoRoot: string, value: unknown, errors: ValidationDiagnostic[]): RepoConventionsConfigV3["docs"] | undefined {
+	if (value === undefined) return undefined;
+	if (!isRecord(value)) {
+		errors.push(diagnostic("invalid-docs", "docs must be an object.", "docs"));
+		return undefined;
+	}
+	for (const key of Object.keys(value)) if (!DOCS_KEYS.has(key)) errors.push(diagnostic("unknown-config-field", `Unknown docs field '${key}'.`, `docs.${key}`));
+	const workflowDocPath = validateDocPath(repoRoot, value.workflowDocPath, errors, "docs.workflowDocPath");
+	let extraContextDocs: NonNullable<RepoConventionsConfigV3["docs"]>["extraContextDocs"];
+	if (value.extraContextDocs !== undefined) {
+		if (!Array.isArray(value.extraContextDocs)) {
+			errors.push(diagnostic("invalid-extra-context-docs", "docs.extraContextDocs must be an array of path-plus-useWhen objects.", "docs.extraContextDocs"));
+		} else {
+			extraContextDocs = value.extraContextDocs.flatMap((item, index) => {
+				const itemPath = `docs.extraContextDocs[${index}]`;
+				if (!isRecord(item)) {
+					errors.push(diagnostic("invalid-extra-context-doc", "Extra context docs must be path-plus-useWhen objects.", itemPath));
+					return [];
+				}
+				for (const key of Object.keys(item)) {
+					if (!EXTRA_CONTEXT_DOC_KEYS_V3.has(key)) errors.push(diagnostic("unknown-config-field", `Unknown extra context doc field '${key}'.`, `${itemPath}.${key}`));
+				}
+				const contextPath = validateDocPath(repoRoot, item.path, errors, `${itemPath}.path`);
+				if (!nonEmptyString(item.useWhen)) errors.push(diagnostic("invalid-use-when", "useWhen must be a non-empty string describing when the workflow branch requires this document.", `${itemPath}.useWhen`));
+				return contextPath && nonEmptyString(item.useWhen) ? [{ path: contextPath, useWhen: item.useWhen }] : [];
+			});
+		}
+	}
+	return workflowDocPath ? { workflowDocPath, ...(extraContextDocs ? { extraContextDocs } : {}) } : undefined;
+}
+
 function validateArchitecture(repoRoot: string, value: unknown, errors: ValidationDiagnostic[]): RepoConventionsConfigV2["architecture"] | undefined {
 	if (value === undefined) return undefined;
 	if (!isRecord(value)) {
@@ -180,19 +213,22 @@ function parseConventionsConfig(repoRoot: string, configPath: string): { config?
 		return { diagnostics: [diagnostic("invalid-json", `Invalid strict JSON in ${configPath}: ${error instanceof Error ? error.message : String(error)}`)], exists: true };
 	}
 	if (!isRecord(parsed)) return { diagnostics: [diagnostic("invalid-config", "Repo conventions config must be a JSON object.")], exists: true };
-	if (parsed.version !== 1 && parsed.version !== 2) {
-		return { diagnostics: [diagnostic("invalid-version", "Repo conventions config requires version: 1 or version: 2.", "version")], exists: true };
+	if (parsed.version !== 1 && parsed.version !== 2 && parsed.version !== 3) {
+		return { diagnostics: [diagnostic("invalid-version", "Repo conventions config requires version: 1, version: 2, or version: 3.", "version")], exists: true };
 	}
 	const version = parsed.version;
 	const topLevelKeys = version === 1 ? TOP_LEVEL_KEYS_V1 : TOP_LEVEL_KEYS_V2;
 	for (const key of Object.keys(parsed)) if (!topLevelKeys.has(key)) diagnostics.push(diagnostic("unknown-config-field", `Unknown top-level config field '${key}'.`, key));
 	const tracker = version === 1 ? validateTrackerV1(repoRoot, parsed.tracker, diagnostics) : validateTrackerV2(repoRoot, parsed.tracker, diagnostics);
 	const toolchain = validateToolchain(parsed.toolchain, diagnostics);
-	const docs = validateDocs(repoRoot, parsed.docs, diagnostics);
+	const docs = version === 3 ? validateDocsV3(repoRoot, parsed.docs, diagnostics) : validateDocs(repoRoot, parsed.docs, diagnostics);
 	if (version === 1) {
 		return { config: { version, ...(tracker ? { tracker } : {}), ...(toolchain ? { toolchain } : {}), ...(docs ? { docs } : {}) }, diagnostics, exists: true };
 	}
 	const architecture = validateArchitecture(repoRoot, parsed.architecture, diagnostics);
+	if (version === 3) {
+		return { config: { version, ...(tracker ? { tracker } : {}), ...(toolchain ? { toolchain } : {}), ...(docs ? { docs } : {}), ...(architecture ? { architecture } : {}) }, diagnostics, exists: true };
+	}
 	return { config: { version, ...(tracker ? { tracker } : {}), ...(toolchain ? { toolchain } : {}), ...(docs ? { docs } : {}), ...(architecture ? { architecture } : {}) }, diagnostics, exists: true };
 }
 
@@ -206,14 +242,14 @@ export function resolveRequiredCheckPolicy(context: ConventionsContext, nativeRe
 	if (nativeRequiredChecks !== undefined) {
 		return { status: "resolved", source: "github", requiredChecks: [...nativeRequiredChecks] };
 	}
-	const configured = context.validation.ok && context.config?.version === 2 ? context.config.tracker?.requiredChecks : undefined;
+	const configured = context.validation.ok && context.config && context.config.version !== 1 ? context.config.tracker?.requiredChecks : undefined;
 	if (configured) {
 		return { status: "resolved", source: "configured", requiredChecks: [...configured] };
 	}
 	return {
 		status: "hard-stop",
 		reason: "missing-required-check-policy",
-		message: "Delivery requires native GitHub required-check policy or tracker.requiredChecks in repo conventions version 2.",
+		message: "Delivery requires native GitHub required-check policy or tracker.requiredChecks in repo conventions version 2 or version 3.",
 	};
 }
 

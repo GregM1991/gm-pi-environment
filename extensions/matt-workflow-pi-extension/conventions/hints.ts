@@ -25,7 +25,11 @@ export function toolchainHint(context: ConventionsContext, cwd: string): string 
 export function docsHint(context: ConventionsContext, cwd: string): string {
 	const configured = context.validation.ok ? context.config?.docs : undefined;
 	if (configured) {
-		const extras = configured.extraContextDocs?.length ? ` Additional context docs: ${configured.extraContextDocs.map((doc) => `\`${doc}\``).join(", ")}.` : "";
+		const extras = configured.extraContextDocs?.length
+			? context.config?.version === 3
+				? ` Additional context docs: ${context.config.docs?.extraContextDocs?.map((doc) => `read \`${doc.path}\` when ${doc.useWhen}`).join("; ")}.`
+				: ` Additional context docs: ${configured.extraContextDocs.map((doc) => `\`${doc}\``).join(", ")}.`
+			: "";
 		return `There is an expanded repo-local workflow doc at \`${configured.workflowDocPath}\`; consult it only when phase guidance is insufficient.${extras}`;
 	}
 	const workflowDoc = path.join(cwd, "docs", "agents", "matt-pocock-ai-feature-workflow.md");

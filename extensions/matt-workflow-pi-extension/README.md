@@ -158,7 +158,7 @@ Normal phase prompts also carry a lightweight reminder to use this lens only whe
 
 ## Repo conventions config
 
-Commands that inject base phase context can read optional strict repo JSON at `.pi/matt-conventions.json` (`version: 1` or `version: 2`). This file is a sibling to `.pi/matt-skill-routes.json`; it controls repo convention hints and delivery policy, not skill routing.
+Commands that inject base phase context can read optional strict repo JSON at `.pi/matt-conventions.json` (`version: 1`, `version: 2`, or `version: 3`). This file is a sibling to `.pi/matt-skill-routes.json`; it controls repo convention hints and delivery policy, not skill routing.
 
 Config shape:
 
@@ -203,9 +203,32 @@ Version 1 remains valid unchanged. Version 2 adds strict delivery policy:
 }
 ```
 
-When the v2 `tracker` section is present, `requiredChecks` must be a non-empty, duplicate-free list of non-empty check names. Delivery resolution prefers native GitHub required policy, falls back to this configured list, and returns an explicit hard-stop when neither exists; observed check runs are never inferred as policy. The optional recap map reference has classifier semantics and is therefore separate from `docs.extraContextDocs`.
+When a version 2 or version 3 `tracker` section is present, `requiredChecks` must be a non-empty, duplicate-free list of non-empty check names. Delivery resolution prefers native GitHub required policy, falls back to this configured list, and returns an explicit hard-stop when neither exists; observed check runs are never inferred as policy. The optional recap map reference has classifier semantics and is therefore separate from `docs.extraContextDocs`.
 
-Doc paths must be repo-relative local paths, must stay inside the repo, and must exist on disk. This includes `architecture.recapPrimitivesPath`. `tracker.type` supports only `github-issues`. Most toolchain commands are hint-only; agents see them as preferred verification commands, but the extension does not execute them automatically. Supported command keys are `test`, `check`, `build`, and `aiGate`.
+Version 3 retains version 2 delivery and architecture fields, but replaces bare extra-context paths with branch-scoped entries:
+
+```json
+{
+  "version": 3,
+  "docs": {
+    "workflowDocPath": "docs/agents/matt-pocock-ai-feature-workflow.md",
+    "extraContextDocs": [
+      {
+        "path": "docs/agents/security-review.md",
+        "useWhen": "reviewing authentication or authorization changes"
+      },
+      {
+        "path": "docs/agents/release.md",
+        "useWhen": "preparing release closeout"
+      }
+    ]
+  }
+}
+```
+
+Each version 3 entry requires exactly `path` and `useWhen`. The path must name an existing repo-local document, and `useWhen` must be a non-empty description of the workflow branch that requires it. Agent hints include both fields. Versions 1 and 2 continue accepting string arrays and preserve their existing hint formatting; migrate a repository to version 3 only after converting every extra-context string to an object.
+
+Doc paths must be repo-relative local paths, must stay inside the repo, and must exist on disk. This includes version 3 `docs.extraContextDocs[].path` and `architecture.recapPrimitivesPath`. `tracker.type` supports only `github-issues`. Most toolchain commands are hint-only; agents see them as preferred verification commands, but the extension does not execute them automatically. Supported command keys are `test`, `check`, `build`, and `aiGate`.
 
 `toolchain.commands.aiGate` is optional and review-specific. When present, `/matt-review` prompts require the agent to run that command and fold must-fix/should-fix findings into the verdict, or report the gate failure explicitly. `/matt-auto` instead runs the command exactly once per issue after the issue commit and before closeout, and captures the gate as a distinct ledger source using the mapping and per-issue deduplication contract in [`augmentations/auto.md`](./augmentations/auto.md). Example: `"aiGate": "bun run ai-gate --base main --head HEAD"`.
 
