@@ -93,6 +93,7 @@ describe("Wayfinder automation boundaries", () => {
 		expect(auto).toContain(`If the target/filter or selected issue involves a milestone, read ${milestoneReference} before filtering the queue`);
 		expect(auto).not.toContain("fall back to linked issues, shared milestone");
 		expect(closeout).toContain(`If the issue belongs to a milestone or milestone closeout is considered, read ${milestoneReference} before reporting or mutating milestone state`);
+		expect(closeout).not.toContain("its state was reported: complete, still has open specs/child work, or needs human cleanup");
 	}));
 
 	test("auto orchestrator waits for running children without polling or mid-child inspection", () => withRepo((cwd) => {
@@ -183,8 +184,9 @@ describe("Wayfinder automation boundaries", () => {
 		expect(auto).toContain("augmentations/auto.md");
 		expect(auto).toContain(".pi/matt-review-ledger.jsonl");
 		expect(auto).toContain("append-only");
-		expect(auto).toContain("closed category taxonomy");
-		expect(auto).toContain("exactly as documented in `augmentations/auto.md`");
+		expect(auto).toContain("schema's generated `--describe` output for closed fields, taxonomies, and relationships");
+		expect(auto).toContain("semantic capture rules and append command in `augmentations/auto.md`");
+		expect(auto).not.toContain("augmentation's closed category taxonomy");
 		expect(auto).toContain("Append every new ledger record only through the validating command");
 		expect(auto).toContain("Treat a rejected append as a hard stop");
 		expect(auto).not.toContain("Require file:line findings, severity, one-line summaries");

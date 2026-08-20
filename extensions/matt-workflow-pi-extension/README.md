@@ -268,7 +268,7 @@ Routing-aware commands hard-stop on invalid config, missing selected routed skil
 
 ## Skill policy
 
-- Loads only the local `matt-workflow` orchestrator skill by default.
+- Always loads the local `matt-workflow` orchestrator; normal discovery additionally registers only the promoted vendor categories described below.
 - Phase prompts reference vendored Matt Pocock engineering skills under `vendor/mattpocock-skills/engineering/`.
 - Phase prompts also reference local phase-scoped augmentation files under `augmentations/`.
 - Treat `vendor/mattpocock-skills/` as upstream-owned/read-only: do not put local workflow customizations there.

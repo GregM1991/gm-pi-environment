@@ -233,7 +233,9 @@ describe("review ledger append CLI", () => {
 			relationships: {
 				taggedBatchOrder: ["review-run", "finding", "publication", "recap"],
 				untaggedRunConsistentFields: ["issue", "cycle", "source", "workerSkillPack"],
-				taggedRunConsistentFields: ["issue", "pullRequest", "source", "subjectSha"],
+				taggedRunConsistentFields: ["issue", "pullRequest", "cycle", "source", "workerSkillPack", "subjectSha"],
+				taggedPublicationConsistentFields: ["issue", "pullRequest", "source", "subjectSha"],
+				taggedRecapConsistentFields: ["issue", "pullRequest", "source", "subjectSha"],
 				repeatAntecedentFields: ["repeatsFindingId", "repeatsLegacyLine"],
 				recapRiskByImpactClass: { composes: "low", extends: "medium", adds: "high" },
 			},
@@ -248,6 +250,27 @@ describe("review ledger append CLI", () => {
 				category,
 			});
 			expect(categoryResult.status).toBe(0);
+		}
+		for (const field of description.recordShapes.untaggedV2Finding.required) {
+			if ([...description.commandStampedFields, "runId"].includes(field)) continue;
+			const incomplete = { ...findingInput } as Record<string, unknown>;
+			delete incomplete[field];
+			expect(runCli(makeRepo(), incomplete).status).not.toBe(0);
+		}
+		const mismatchedFindingValues: Record<string, unknown> = {
+			issue: 51,
+			pullRequest: 71,
+			cycle: "fix-1",
+			source: "ai-gate",
+			workerSkillPack: ["implement"],
+			subjectSha: "b".repeat(40),
+		};
+		for (const field of description.relationships.taggedRunConsistentFields) {
+			const finding = { ...taggedBatchInput[1], [field]: mismatchedFindingValues[field] };
+			if (field === "source") finding.severity = "must-fix";
+			const mismatch = runBatchCli(makeRepo(), [taggedBatchInput[0], finding]);
+			expect(mismatch.status).not.toBe(0);
+			expect(mismatch.stderr).toContain("must match its review-run metadata");
 		}
 	});
 
