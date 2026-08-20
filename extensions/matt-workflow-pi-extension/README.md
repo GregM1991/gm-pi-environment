@@ -2,7 +2,7 @@
 
 Personal Pi package for Matt Pocock-style AI feature workflow orchestration.
 
-The extension is intentionally thin: it loads the `matt-workflow` orchestrator skill, then each `/matt-*` command tells the agent which vendored Matt engineering skill files are relevant for the current phase.
+The extension is intentionally thin: it loads the small, universal `matt-workflow` router, then each `/matt-*` command supplies the active Phase contract and its precise skill, Augmentation, and Agent Reference pointers.
 
 ## Commands
 
@@ -270,7 +270,7 @@ Routing-aware commands hard-stop on invalid config, missing selected routed skil
 
 ## Skill policy
 
-- Always loads the local `matt-workflow` orchestrator; normal discovery additionally registers only the promoted vendor categories described below.
+- Always loads the local `matt-workflow` router; normal discovery additionally registers only the promoted vendor categories described below.
 - Phase prompts reference vendored Matt Pocock engineering skills under `vendor/mattpocock-skills/engineering/`.
 - Phase prompts also reference local phase-scoped augmentation files under `augmentations/`.
 - Phase steps point to focused policy under `docs/agents/` when one Job spans multiple steps or Phase clients; these Agent References are binding when their branch fires.

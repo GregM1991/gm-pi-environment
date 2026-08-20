@@ -375,6 +375,30 @@ describe("resource discovery", () => {
 });
 
 describe("command registration", () => {
+	test("always-discovered router contains only universal invariants and precise Phase-reference guidance", () => withRepo((cwd) => {
+		const router = readFileSync(path.join(import.meta.dir, "skills", "matt-workflow", "SKILL.md"), "utf8");
+		const grill = phasePrompt("grill", "#42", cwd);
+		const auto = phasePrompt("auto", "ready-for-agent", cwd);
+		const milestone = readFileSync(path.join(import.meta.dir, "docs", "agents", "milestones.md"), "utf8");
+
+		expect(router).toContain("The generated Phase message is the active workflow Interface");
+		expect(router).toContain("follow each branch-triggered Augmentation and Agent Reference pointer");
+		expect(router).toContain("Local Augmentations override conflicting upstream skill guidance");
+		expect(router).toContain("Tracker mutations are Phase actions");
+		expect(router).not.toContain("MATT-GRILL-NOTES.md");
+		expect(router).not.toContain("three fix/review cycles");
+		expect(router).not.toContain("wayfinder:map");
+		expect(router).not.toContain("## Architecture learning lens");
+		expect(router).not.toContain(".pi/matt-skill-routes.json");
+		expect(router).not.toContain("Milestone = strategic delivery arc");
+
+		expect(grill).toContain("MATT-GRILL-NOTES.md");
+		expect(auto).toContain(autoReferencePath("auto-artifacts"));
+		expect(auto).toContain(autoReferencePath("auto-child-contracts"));
+		expect(auto).toContain(autoReferencePath("auto-review-ledger"));
+		expect(milestone).toContain("Milestone = strategic delivery arc");
+	}));
+
 	test("status and milestone-review commands point to canonical reporting rules", async () => withRepoAsync(async (cwd) => {
 		type RegisteredCommand = { handler: (args: string, ctx: { cwd: string; ui: { notify: (message: string) => void } }) => Promise<void> };
 		let status: RegisteredCommand | undefined;

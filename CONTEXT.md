@@ -58,6 +58,10 @@ _Avoid_: near-duplicate skill
 One narrow step of the product pipeline — intake, grill, PRD, refactors, slice, AFK, review, closeout, auto. A session works exactly one phase and does not jump ahead to later phases.
 _Avoid_: stage-skipping, planning-to-implementation drift
 
+**Matt Workflow Router**:
+The always-discovered skill whose Interface contains only universal workflow invariants, Phase boundaries, and instructions for following the active generated Phase message and its pointers. Phase-specific policy belongs to prompts, Augmentations, or Agent References.
+_Avoid_: workflow manual, phase-policy cache, duplicate orchestrator
+
 **Fresh-context Session**:
 A new Pi session spawned for implementation or review work so outcomes rest on durable artifacts (issues, docs, diffs) instead of long conversation history.
 _Avoid_: long-conversation context as memory

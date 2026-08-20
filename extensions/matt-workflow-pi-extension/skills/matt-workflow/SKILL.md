@@ -1,69 +1,28 @@
 ---
 name: matt-workflow
-description: Thin orchestration skill for the Matt Pocock AI feature workflow extension. Use only as the always-loaded entrypoint when running pi-matt; phase-specific behavior should come from the vendored mattpocock/skills engineering files referenced by the extension for the current phase.
+description: Always-discovered router for the Matt Pocock AI feature workflow extension. Use to enter and follow the current generated Phase; branch-specific behavior comes from that Phase message and its precise skill, Augmentation, and Agent Reference pointers.
 ---
 
-# Matt workflow orchestrator
+# Matt workflow router
 
-This is intentionally a **thin** always-loaded skill.
+This router is the small, always-loaded Interface to the workflow. The extension owns command-to-Phase routing and phase-to-skill mapping; this file does not recreate Phase policy.
 
-Do not treat this file as the full workflow specification. The extension loads all vendored `mattpocock/skills` engineering skills into Pi and injects phase-specific references to narrow the current phase. Use only the Matt engineering skills that apply to the current phase and target.
+## Universal invariants
 
-## Operating rules
+- The generated Phase message is the active workflow Interface. Complete only that Phase and do not perform actions reserved for a later Phase.
+- Tracker mutations are Phase actions. Perform them only when the active Phase message or an explicit user request authorizes them.
+- Use durable repo context named by the Phase: root and relevant directory `AGENTS.md`, `CONTEXT.md`, ADRs, workflow docs, and tracker issues.
+- Treat Vendored Matt Skills as read-only upstream guidance. Local Augmentations override conflicting upstream skill guidance.
+- Use only skills listed by the current Phase or assigned through its routed skill pack. Read applicable selected files at their supplied paths before acting; skip a listed skill that does not fit and briefly state why.
+- Keep completion evidence durable and satisfy every active Done condition before leaving the Phase.
 
-- Keep the current phase narrow.
-- Do not jump from planning to implementation unless the user invoked the implementation phase.
-- Use `/matt-wayfinder` as an optional pre-spec path only for large, foggy, multi-session destinations. It maps decisions and hands a cleared map to `/matt-spec`, then `/matt-tickets`; it never implements destination work.
-- Never route `wayfinder:map` or any `wayfinder:*` decision ticket through `/matt-afk` or `/matt-auto`, even when it is described as AFK or carries `ready-for-agent`. Wayfinder HITL tickets require the live user.
-- Do not close or relabel issues unless the user invoked `/matt-closeout`, invoked `/matt-auto`, invoked no-argument `/matt-afk`, or explicitly asked for issue closeout.
-- In auto-loop mode, keep the parent session as orchestrator. When Pi subagent tooling is available, use the `worker` agent for implementation/fix children and the `reviewer` agent for review children, always with `context: "fresh"`; do not substitute a generic delegate silently.
-- Auto-loop review remediation allows up to three fix/review cycles after the initial review. A concrete `FIX` or `BLOCKER` finding should continue to a fix worker and fresh reviewer while budget remains; `BLOCKER` alone is not a reason to stop unless resolving it requires human judgment or another explicit safety stop.
-- Use durable repo context: `AGENTS.md`, `CONTEXT.md`, relevant ADRs, relevant directory `AGENTS.md`, and named GitHub issues.
-- Use GitHub Issues when tracker work is needed, with the labels documented in `docs/agents/triage-labels.md` when that file exists; otherwise follow the repo's own tracker/label conventions or recommend `setup-matt-pocock-skills`.
-- When a Phase involves a GitHub milestone, follow that Phase's pointer to the canonical Milestone reference. Until it is read, never mutate a milestone without explicit user direction or treat membership as hierarchy or readiness.
-- If a phase prompt lists Matt engineering skills that do not fit the task, skip them and briefly say why.
-- Use only skills listed in the current phase prompt or assigned via a skill pack (baseline plus routed skills from an issue-aware skill routing contract, with absolute `SKILL.md` paths). Do not pull in other skills as workflow guidance on your own.
+## Follow the active Phase
 
-## Architecture learning lens
+1. Read the generated Phase message fully: objective, hard constraints, ordered contract when present, and Done conditions.
+2. At the step or condition named by the message, follow each branch-triggered Augmentation and Agent Reference pointer before acting on that branch.
+3. Apply applicable vendored and routed skill guidance inside the Phase contract. The Phase message and its local references determine role, scope, authority, and stop behavior.
+4. When a required pointer is missing or unreadable, stop at that branch and report the missing authoritative guidance instead of reconstructing policy from this router.
 
-The workflow may include lightweight deep-module teaching checkpoints. These are for exercising the user's own mental model, not for turning every target into an architecture review. They belong only in human-present phases; unattended AFK/auto worker and review sessions have no user to teach and must skip the lens entirely.
+## Phase boundaries
 
-Use the architecture terms consistently: **Module**, **Interface**, **Implementation**, **Depth**, **Seam**, **Adapter**, **Leverage**, and **Locality**.
-
-When a target is architecture-sensitive, prefer short prompts that help the user practise recognition:
-
-- What **Module** or domain concept is being touched?
-- What does the **Interface** force callers to know beyond the type signature?
-- Which hidden caller knowledge belongs behind the **Interface**?
-- What does the deletion test say?
-- Is the **Seam** real, with multiple **Adapters**, or hypothetical?
-- Where would more **Depth** improve **Leverage** for callers or **Locality** for maintainers?
-- Are tests exercising the **Interface**, or reaching through it into the **Implementation**?
-
-`/matt-arch-lens` gives a compact teaching pass over a target. `/matt-arch-gym` is interactive practice: ask the user to answer first, then coach the answer using repo or issue examples. Keep both modes high-level unless the user asks to explore a candidate more deeply.
-
-## Grill notes and refactor extraction
-
-During GRILL / ALIGNMENT for codebase work, maintain a repo-local, top-level temporary scratch document named `MATT-GRILL-NOTES.md` when there is something to record. Create it lazily; do not create an empty file at phase start.
-
-The document has two jobs:
-
-1. Preserve grill Q&A decisions in an append-only numbered record so later phases do not rely on long conversation context.
-2. Track potential refactors discovered during grilling that are outside the spec scope. The refactor section may be updated and regrouped as understanding improves.
-
-After spec completion, run the formal refactor-review phase before ticket decomposition. In that phase, quickly walk the user through out-of-scope refactor candidates, decide which should become GitHub issues, create requested issues using the repo tracker conventions, then ask for explicit confirmation before deleting `MATT-GRILL-NOTES.md`. Do not move into ticket decomposition until the user has been prompted about deletion.
-
-The extension owns the phase-to-engineering-skill mapping.
-
-## Issue-aware skill routing
-
-Routing-aware commands (`/matt-route-skills`, `/matt-init-skill-routes`, `/matt-tickets`, `/matt-afk`, and `/matt-auto`) use `.pi/matt-skill-routes.json` plus typed extension defaults. Invalid routing config, missing selected skills, and high-confidence overflow are hard stops for implementation automation.
-
-When a prompt includes a routing contract:
-
-- Treat selected skill IDs and absolute `SKILL.md` paths as mandatory upfront guidance for the child agent.
-- Keep baseline worker skills (`implement`, `tdd`) even if a repo disables routed skills.
-- Let workers report only a compact `Skill adjustments` line (`none` if unchanged) after repo exploration; do not turn routing into an audit checklist.
-- Do not name skills in commits or issue closeout comments.
-
-When ticket decomposition, include visible `## Agent skill hints` and the machine-readable `matt-agent-skill-hints` JSON comment in child issue bodies. These hints are low-authority diagnostics; auto mode recomputes routing from the final child issue before implementation.
+One extension command selects one active Phase. A Phase may recommend its successor, but it does not execute the successor unless its generated message contains an explicit ordered loop contract. The generated Phase message is the source of truth for allowed artifacts, human-presence requirements, orchestration, tracker mutations, and completion evidence.
