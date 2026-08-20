@@ -1,10 +1,12 @@
 # Matt workflow augmentation: auto review ledger
 
-Record formats for the repo-local `.pi/matt-review-ledger.jsonl`, layered on top of the `/matt-auto` phase. Lifecycle rules (when to append, commit placement, and loop-log reporting) live in the auto phase prompt; this file owns the normative JSONL format and closed taxonomies.
+Semantic rules and examples for the repo-local `.pi/matt-review-ledger.jsonl`, layered on top of the `/matt-auto` phase. Lifecycle rules (when to append, commit placement, and loop-log reporting) live in the auto phase prompt. The executable schema owns record fields, closed taxonomies, and structural relationships; do not copy those lists into agent guidance.
 
 ## Validating append command
 
-Append every new record through `(cd <extension-root> && bun run review-ledger:append -- --repo-root <target-repo-root> --record '<json>' [--run-id <uuidv4>])`. Supply the record fields documented below without `schemaVersion`, `date`, or `runId`; the command sets `schemaVersion: 2`, stamps the current ISO 8601 UTC date, and generates the run UUID. For additional findings from the same review execution, pass the `runId` returned by the first successful append with `--run-id`.
+Before constructing records, read the current agent-facing contract through `(cd <extension-root> && bun run review-ledger:append -- --describe)`. Its output comes from the schema constants used by validation and does not read, create, lock, or modify a target ledger.
+
+Append every new record through `(cd <extension-root> && bun run review-ledger:append -- --repo-root <target-repo-root> --record '<json>' [--run-id <uuidv4>])`. Supply the input fields from `--describe` without the command-stamped fields. The command generates the run UUID for the first untagged record; for additional findings from the same review execution, pass the returned `runId` with `--run-id`.
 
 The command validates the complete existing ledger plus the candidate record before appending. It rejects malformed or out-of-taxonomy records, incompatible run reuse including PASS mixed with findings, duplicate finding identities, invalid repeat provenance, and a second AI-gate run for the same issue. A rejection prints a specific reason and exits non-zero without appending. Treat any rejection as a hard stop: never work around it by writing, echoing, or editing a JSONL line directly.
 
@@ -28,16 +30,7 @@ Append one compact JSON object per line. Never rewrite, reorder, delete, migrate
 
 Unversioned records are legacy. They continue to use the original finding or verdict-only PASS shapes exactly as before: `source` may be omitted and then means `review-child`, finding severity remains any non-empty string, finding verdict may be `PASS`, `FIX`, or `BLOCKER`, and verdict-only PASS omits `workerSkillPack`. Reject an unversioned record that adds v2-only fields. Mixed legacy/v2 ledgers are valid, and existing lines are never migrated.
 
-Every newly appended record uses `schemaVersion: 2` and requires:
-
-- `date`: ISO 8601 UTC timestamp
-- `issue`: positive GitHub issue number
-- `cycle`: `initial`, `fix-1`, `fix-2`, or `fix-3`
-- `source`: `review-child` or `ai-gate`
-- `runId`: a canonical lowercase RFC 4122 UUIDv4 naming this one review execution
-- `workerSkillPack`: the non-empty skill-ID list active for the implementation or fix worker in this cycle
-
-Reject any present `schemaVersion` other than `2`. One v2 run is exactly one verdict-only PASS record or one-or-more finding records. Every record sharing a `runId` must share issue, cycle, source, and worker skill pack; never reuse a run ID for incompatible metadata.
+Every newly appended record uses `schemaVersion: 2`. `--describe` is authoritative for required and optional fields and for the current closed values. One untagged v2 run is exactly one verdict-only PASS record or one-or-more finding records. Every record sharing a `runId` must share the relationship fields reported by `--describe`; never reuse a run ID for incompatible metadata.
 
 ## Tagged v2 PR-era records
 
@@ -52,25 +45,7 @@ Finding UUID, Publication UUID/external-key, Recap UUID/cadence, run identity, S
 
 ## V2 finding record
 
-For every novel finding, append one v2 record with the common fields above plus:
-
-- `verdict`: `FIX` or `BLOCKER`; never `PASS`
-- `findingId`: a globally unique canonical lowercase RFC 4122 UUIDv4
-- `location`: primary review location as `file:line`
-- `severity`: for `review-child`, `high`, `medium`, `low`, or `blocking`; for `ai-gate`, `must-fix`, `should-fix`, `non-remediable-blocker`, or `blocking`. Reserve `blocking` for synthesized execution/parsing failures recorded as `BLOCKER`/`verification-skipped`
-- `summary`: one-line finding summary
-- `category`: one value from the closed category taxonomy below
-- `whyMissed`: the source's stated reason, or the orchestrator's one-line classification of what the worker did not take into account
-- `repeat`: `none`, `earlier-cycle`, or `earlier-issue`
-
-The closed category taxonomy is:
-
-- `spec-miss`
-- `correctness`
-- `test-gap`
-- `convention-violation`
-- `architecture`
-- `verification-skipped`
+For every novel finding, append one v2 finding record using the shape and source-specific closed values reported by `--describe`. Findings never use a PASS verdict. Reserve blocking severity for synthesized execution/parsing failures recorded as a blocking verification-skipped result. `whyMissed` states the source's reason or the orchestrator's one-line classification of what the worker did not take into account, and `location` names the primary `file:line`.
 
 Repeat provenance is exact:
 

@@ -3,7 +3,13 @@ import { appendFileSync, chmodSync, closeSync, constants, existsSync, fstatSync,
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { dlopen, FFIType } from "bun:ffi";
-import { parseReviewLedger, validateReviewLedgerRecord, type ReviewLedgerRecord } from "./schema";
+import {
+	describeReviewLedgerSchema,
+	parseReviewLedger,
+	REVIEW_LEDGER_COMMAND_STAMPED_FIELDS,
+	validateReviewLedgerRecord,
+	type ReviewLedgerRecord,
+} from "./schema";
 
 const REVIEW_LEDGER_PATH = ".pi/matt-review-ledger.jsonl";
 
@@ -250,7 +256,7 @@ function appendReviewLedgerRecords(options: {
 		const stampedRecords: ReviewLedgerRecord[] = [];
 		for (const input of options.inputs) {
 			const candidateLine = firstCandidateLine + stampedRecords.length;
-			for (const stampedField of ["schemaVersion", "date"] as const) {
+			for (const stampedField of REVIEW_LEDGER_COMMAND_STAMPED_FIELDS) {
 				if (stampedField in input) {
 					const reason = `${stampedField} is stamped by the append command and must be omitted`;
 					throw new Error(options.batch ? `line ${candidateLine}: ${reason}` : reason);
@@ -329,6 +335,10 @@ function parseArguments(args: string[]): { repoRoot: string; records: AppendRevi
 }
 
 function runAppendReviewLedgerCli(args: string[]): void {
+	if (args.length === 1 && args[0] === "--describe") {
+		console.log(JSON.stringify(describeReviewLedgerSchema()));
+		return;
+	}
 	const options = parseArguments(args);
 	const result = appendReviewLedgerRecords({ cwd: path.resolve(options.repoRoot), inputs: options.records, runId: options.runId, batch: options.batch });
 	const firstRecord = result.records[0];

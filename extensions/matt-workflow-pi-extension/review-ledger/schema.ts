@@ -16,6 +16,75 @@ export const REVIEW_LEDGER_RECORD_TYPES = ["review-run", "finding", "publication
 export const REVIEW_PUBLICATION_SURFACES = ["pr-review-summary", "pr-review-thread"] as const;
 export const REVIEW_RECAP_IMPACT_CLASSES = ["composes", "extends", "adds"] as const;
 export const REVIEW_RECAP_RISKS = ["low", "medium", "high"] as const;
+export const REVIEW_LEDGER_COMMAND_STAMPED_FIELDS = ["schemaVersion", "date"] as const;
+
+export const REVIEW_LEDGER_RECORD_SHAPES = {
+	legacyPass: {
+		required: ["date", "issue", "cycle", "verdict"],
+		optional: ["source"],
+	},
+	legacyFinding: {
+		required: ["date", "issue", "cycle", "verdict", "location", "severity", "summary", "category", "whyMissed", "workerSkillPack", "repeat"],
+		optional: ["source"],
+	},
+	untaggedV2Pass: {
+		required: ["schemaVersion", "date", "issue", "cycle", "verdict", "source", "runId", "workerSkillPack"],
+		optional: [],
+	},
+	untaggedV2Finding: {
+		required: ["schemaVersion", "date", "issue", "cycle", "verdict", "source", "runId", "workerSkillPack", "findingId", "location", "severity", "summary", "category", "whyMissed", "repeat"],
+		optional: ["repeatsFindingId", "repeatsLegacyLine", "recurringClassKey"],
+	},
+	taggedReviewRun: {
+		required: ["schemaVersion", "recordType", "date", "issue", "pullRequest", "cycle", "source", "runId", "workerSkillPack", "subjectSha", "verdict", "findingIds", "suppressedDuplicateCount"],
+		optional: [],
+	},
+	taggedFinding: {
+		required: ["schemaVersion", "recordType", "date", "issue", "pullRequest", "cycle", "source", "runId", "workerSkillPack", "subjectSha", "verdict", "findingId", "location", "severity", "summary", "category", "whyMissed", "repeat"],
+		optional: ["repeatsFindingId", "repeatsLegacyLine", "recurringClassKey"],
+	},
+	taggedPublication: {
+		required: ["schemaVersion", "recordType", "date", "publicationId", "issue", "pullRequest", "subjectSha", "source", "runId", "provider", "surface", "externalKey"],
+		optional: ["findingId", "url"],
+	},
+	taggedRecap: {
+		required: ["schemaVersion", "recordType", "date", "recapId", "issue", "pullRequest", "subjectSha", "source", "runId", "impactClass", "displayedRisk", "touchedRecapPrimitiveIds", "removedRecapPrimitiveIds", "touchedInvariantIds"],
+		optional: [],
+	},
+} as const;
+
+export const REVIEW_LEDGER_RELATIONSHIPS = {
+	taggedBatchOrder: ["review-run", "finding", "publication", "recap"],
+	untaggedRunConsistentFields: ["issue", "cycle", "source", "workerSkillPack"],
+	taggedRunConsistentFields: ["issue", "pullRequest", "source", "subjectSha"],
+	repeatAntecedentFields: ["repeatsFindingId", "repeatsLegacyLine"],
+	recapRiskByImpactClass: { composes: "low", extends: "medium", adds: "high" },
+} as const;
+
+export function describeReviewLedgerSchema() {
+	return {
+		schemaVersion: 2,
+		mutatesLedger: false,
+		commandStampedFields: REVIEW_LEDGER_COMMAND_STAMPED_FIELDS,
+		taxonomies: {
+			sources: REVIEW_LEDGER_SOURCES,
+			cycles: REVIEW_LEDGER_CYCLES,
+			verdicts: REVIEW_LEDGER_VERDICTS,
+			categories: REVIEW_LEDGER_CATEGORIES,
+			repeats: REVIEW_LEDGER_REPEATS,
+			severitiesBySource: {
+				"review-child": REVIEW_CHILD_SEVERITIES,
+				"ai-gate": AI_GATE_SEVERITIES,
+			},
+			recordTypes: REVIEW_LEDGER_RECORD_TYPES,
+			publicationSurfaces: REVIEW_PUBLICATION_SURFACES,
+			recapImpactClasses: REVIEW_RECAP_IMPACT_CLASSES,
+			recapRisks: REVIEW_RECAP_RISKS,
+		},
+		recordShapes: REVIEW_LEDGER_RECORD_SHAPES,
+		relationships: REVIEW_LEDGER_RELATIONSHIPS,
+	};
+}
 
 export type ReviewLedgerSource = typeof REVIEW_LEDGER_SOURCES[number];
 export type ReviewLedgerCycle = typeof REVIEW_LEDGER_CYCLES[number];
@@ -147,29 +216,28 @@ export type ReviewLedgerRecord = ReviewLedgerPassRecord | ReviewLedgerFindingRec
 export type ReviewLedgerValidation = { ok: true; record: ReviewLedgerRecord } | { ok: false; reason: string };
 export type ReviewLedgerParseResult = { ok: true; records: ReviewLedgerRecord[] } | { ok: false; errors: Array<{ line: number; reason: string }> };
 
-const LEGACY_COMMON_FIELDS = new Set(["date", "issue", "cycle", "verdict", "source"]);
-const LEGACY_FINDING_FIELDS = ["location", "severity", "summary", "category", "whyMissed", "workerSkillPack", "repeat"] as const;
-const LEGACY_ALL_FIELDS = new Set([...LEGACY_COMMON_FIELDS, ...LEGACY_FINDING_FIELDS]);
-const V2_COMMON_FIELDS = new Set([...LEGACY_COMMON_FIELDS, "schemaVersion", "runId", "workerSkillPack"]);
+type ReviewLedgerRecordShape = typeof REVIEW_LEDGER_RECORD_SHAPES[keyof typeof REVIEW_LEDGER_RECORD_SHAPES];
+
+function recordShapeFields(shape: ReviewLedgerRecordShape): Set<string> {
+	return new Set<string>([...shape.required, ...shape.optional]);
+}
+
+const LEGACY_COMMON_FIELDS = recordShapeFields(REVIEW_LEDGER_RECORD_SHAPES.legacyPass);
+const LEGACY_ALL_FIELDS = recordShapeFields(REVIEW_LEDGER_RECORD_SHAPES.legacyFinding);
+const LEGACY_FINDING_FIELDS = REVIEW_LEDGER_RECORD_SHAPES.legacyFinding.required.filter((field) => !LEGACY_COMMON_FIELDS.has(field));
+const V2_COMMON_FIELDS = recordShapeFields(REVIEW_LEDGER_RECORD_SHAPES.untaggedV2Pass);
+const V2_ALL_FIELDS = recordShapeFields(REVIEW_LEDGER_RECORD_SHAPES.untaggedV2Finding);
 const V2_FINDING_FIELDS = [
-	"findingId",
-	"location",
-	"severity",
-	"summary",
-	"category",
-	"whyMissed",
-	"repeat",
-	"repeatsFindingId",
-	"repeatsLegacyLine",
-	"recurringClassKey",
-] as const;
-const V2_ALL_FIELDS = new Set([...V2_COMMON_FIELDS, ...V2_FINDING_FIELDS]);
+	...REVIEW_LEDGER_RECORD_SHAPES.untaggedV2Finding.required,
+	...REVIEW_LEDGER_RECORD_SHAPES.untaggedV2Finding.optional,
+].filter((field) => !V2_COMMON_FIELDS.has(field));
+const V2_REQUIRED_FINDING_FIELDS = REVIEW_LEDGER_RECORD_SHAPES.untaggedV2Finding.required.filter((field) => !V2_COMMON_FIELDS.has(field));
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const FULL_GIT_SHA = /^[0-9a-f]{40}$/;
-const TAGGED_RUN_FIELDS = new Set(["schemaVersion", "recordType", "date", "issue", "pullRequest", "cycle", "source", "runId", "workerSkillPack", "subjectSha", "verdict", "findingIds", "suppressedDuplicateCount"]);
-const TAGGED_FINDING_FIELDS = new Set([...V2_ALL_FIELDS, "recordType", "pullRequest", "subjectSha"]);
-const PUBLICATION_FIELDS = new Set(["schemaVersion", "recordType", "date", "publicationId", "issue", "pullRequest", "subjectSha", "source", "runId", "findingId", "provider", "surface", "externalKey", "url"]);
-const RECAP_FIELDS = new Set(["schemaVersion", "recordType", "date", "recapId", "issue", "pullRequest", "subjectSha", "source", "runId", "impactClass", "displayedRisk", "touchedRecapPrimitiveIds", "removedRecapPrimitiveIds", "touchedInvariantIds"]);
+const TAGGED_RUN_FIELDS = recordShapeFields(REVIEW_LEDGER_RECORD_SHAPES.taggedReviewRun);
+const TAGGED_FINDING_FIELDS = recordShapeFields(REVIEW_LEDGER_RECORD_SHAPES.taggedFinding);
+const PUBLICATION_FIELDS = recordShapeFields(REVIEW_LEDGER_RECORD_SHAPES.taggedPublication);
+const RECAP_FIELDS = recordShapeFields(REVIEW_LEDGER_RECORD_SHAPES.taggedRecap);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -368,8 +436,7 @@ function validateV2Record(value: Record<string, unknown>): ReviewLedgerValidatio
 		};
 	}
 
-	const requiredFindingFields = ["findingId", "location", "severity", "summary", "category", "whyMissed", "repeat"] as const;
-	for (const field of requiredFindingFields) {
+	for (const field of V2_REQUIRED_FINDING_FIELDS) {
 		if (!(field in value)) return invalid(`finding record is missing ${field}`);
 	}
 	if (value.verdict !== "FIX" && value.verdict !== "BLOCKER") return invalid("v2 finding record must use FIX or BLOCKER");
@@ -518,7 +585,7 @@ function validateRecap(value: Record<string, unknown>): ReviewLedgerValidation {
 	const removed = value.removedRecapPrimitiveIds as string[];
 	if (removed.some((id) => touched.includes(id))) return invalid("removedRecapPrimitiveIds must be separate from touchedRecapPrimitiveIds");
 	if (removed.length > 0 && value.displayedRisk !== "high") return invalid("recap with removed primitives must use displayedRisk high");
-	const expectedRisk = { composes: "low", extends: "medium", adds: "high" }[value.impactClass as ReviewRecapImpactClass];
+	const expectedRisk = REVIEW_LEDGER_RELATIONSHIPS.recapRiskByImpactClass[value.impactClass as ReviewRecapImpactClass];
 	if (removed.length === 0 && value.displayedRisk !== expectedRisk) return invalid(`${value.impactClass as string} recap must use displayedRisk ${expectedRisk}`);
 	return {
 		ok: true,

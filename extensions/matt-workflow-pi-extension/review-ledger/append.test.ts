@@ -36,6 +36,13 @@ function runBatchCli(repoRoot: string, records: unknown[]) {
 	});
 }
 
+function runDescribeCli(cwd: string) {
+	return spawnSync("bun", [CLI_PATH, "--describe"], {
+		cwd,
+		encoding: "utf8",
+	});
+}
+
 function runCliAsync(repoRoot: string, record: unknown, runId?: string): Promise<{ status: number | null; stderr: string }> {
 	return new Promise((resolve, reject) => {
 		const child = spawn("bun", cliArgs(repoRoot, record, runId), { cwd: import.meta.dir, stdio: ["ignore", "ignore", "pipe"] });
@@ -183,6 +190,67 @@ afterEach(() => {
 });
 
 describe("review ledger append CLI", () => {
+	test("describes the validation contract without creating or modifying a ledger", () => {
+		const cwd = makeRepo();
+		mkdirSync(path.join(cwd, ".pi"), { recursive: true });
+		const ledgerPath = path.join(cwd, ".pi", "matt-review-ledger.jsonl");
+		writeFileSync(ledgerPath, "existing ledger marker\n");
+
+		const result = runDescribeCli(cwd);
+
+		expect(result.status).toBe(0);
+		expect(result.stderr).toBe("");
+		const description = JSON.parse(result.stdout);
+		expect(description).toMatchObject({
+			schemaVersion: 2,
+			mutatesLedger: false,
+			commandStampedFields: ["schemaVersion", "date"],
+			taxonomies: {
+				sources: ["review-child", "ai-gate"],
+				cycles: ["initial", "fix-1", "fix-2", "fix-3"],
+				verdicts: ["PASS", "FIX", "BLOCKER"],
+				categories: ["spec-miss", "correctness", "test-gap", "convention-violation", "architecture", "verification-skipped"],
+				repeats: ["none", "earlier-cycle", "earlier-issue"],
+				severitiesBySource: {
+					"review-child": ["high", "medium", "low", "blocking"],
+					"ai-gate": ["must-fix", "should-fix", "non-remediable-blocker", "blocking"],
+				},
+				recordTypes: ["review-run", "finding", "publication", "recap"],
+				publicationSurfaces: ["pr-review-summary", "pr-review-thread"],
+				recapImpactClasses: ["composes", "extends", "adds"],
+				recapRisks: ["low", "medium", "high"],
+			},
+			recordShapes: {
+				untaggedV2Pass: {
+					required: ["schemaVersion", "date", "issue", "cycle", "verdict", "source", "runId", "workerSkillPack"],
+					optional: [],
+				},
+				taggedPublication: {
+					required: ["schemaVersion", "recordType", "date", "publicationId", "issue", "pullRequest", "subjectSha", "source", "runId", "provider", "surface", "externalKey"],
+					optional: ["findingId", "url"],
+				},
+			},
+			relationships: {
+				taggedBatchOrder: ["review-run", "finding", "publication", "recap"],
+				untaggedRunConsistentFields: ["issue", "cycle", "source", "workerSkillPack"],
+				taggedRunConsistentFields: ["issue", "pullRequest", "source", "subjectSha"],
+				repeatAntecedentFields: ["repeatsFindingId", "repeatsLegacyLine"],
+				recapRiskByImpactClass: { composes: "low", extends: "medium", adds: "high" },
+			},
+		});
+		expect(readFileSync(ledgerPath, "utf8")).toBe("existing ledger marker\n");
+		expect(readdirSync(path.join(cwd, ".pi"))).toEqual(["matt-review-ledger.jsonl"]);
+		for (const [index, category] of description.taxonomies.categories.entries()) {
+			const categoryRepo = makeRepo();
+			const categoryResult = runCli(categoryRepo, {
+				...findingInput,
+				findingId: `00000000-0000-4000-8000-${String(index + 20).padStart(12, "0")}`,
+				category,
+			});
+			expect(categoryResult.status).toBe(0);
+		}
+	});
+
 	test("appends a valid v2 record while stamping its date and run identity", () => {
 		const cwd = makeRepo();
 		const result = runCli(cwd, passInput);

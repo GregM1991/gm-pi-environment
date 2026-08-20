@@ -14,7 +14,9 @@ The workflow needs a repo-local artifact that preserves review outcomes across s
 
 Use `.pi/matt-review-ledger.jsonl` as an append-only, repo-local review ledger for `/matt-auto`.
 
-The local [`augmentations/auto.md`](../../extensions/matt-workflow-pi-extension/augmentations/auto.md) file owns the normative record format. Unversioned records remain valid under the legacy finding and verdict-only PASS shapes: `source` may be omitted and defaults to `review-child`, finding severity remains any non-empty string, and v2-only fields are rejected. Append-only history is never migrated.
+The executable Review Ledger schema Module owns the normative record fields, closed taxonomies, and structural relationship constants, and validation consumes those exports. The append CLI exposes the same contract through non-mutating `--describe` mode, which needs no repository path and never reads, creates, locks, or modifies a ledger. The local [`augmentations/auto.md`](../../extensions/matt-workflow-pi-extension/augmentations/auto.md) file retains semantic capture rules and worked examples without owning a second vocabulary.
+
+Unversioned records remain valid under the legacy finding and verdict-only PASS shapes: `source` may be omitted and defaults to `review-child`, finding severity remains any non-empty string, and v2-only fields are rejected. Append-only history is never migrated.
 
 Existing untagged records continue to use `schemaVersion: 2`, identify their source as `review-child` or `ai-gate`, and carry a UUID run identity plus the active `workerSkillPack`, including verdict-only PASS records. An untagged v2 run is either one PASS record or one-or-more finding records with UUID finding identities. Findings use the closed category taxonomy, source-specific severity vocabulary, and exact repeat provenance through a prior v2 finding UUID or legacy JSONL line; cross-issue repeats also persist their recurring-class key.
 
@@ -31,6 +33,7 @@ Positive:
 - Review outcomes and recurring misses survive individual Pi sessions.
 - Append-only JSONL keeps writes simple, reviewable, and resilient across auto-loop iterations.
 - Closed source and category taxonomies support stable, source-specific clustering while legacy/untagged PASS records and tagged Review Run Summaries preserve denominator data.
+- Schema-generated describe output lets agents discover the current field and relationship contract without documentation drifting from validation.
 - Producer identity, reviewed Subject SHA, confirmed publication identity, recurrence, and recap risk remain independently auditable without conflating GitHub transport with findings.
 - Legacy source-less records remain analyzable without violating append-only history.
 - Same-cycle deduplication prevents one corroborated miss from inflating finding counts.
