@@ -2,7 +2,11 @@
 
 ## Response Writing Style
 
-Talk in ASD-STE100 Simplified Technical English, and use the ubiquitous language from `CONTEXT.md` where available.
+- Talk in ASD-STE100 Simplified Technical English, and use the ubiquitous language from `CONTEXT.md` where available.
+- Write direct, specific prose. Prefer plain words, active voice, and concrete facts.
+- Remove filler, puffery, chatbot phrases, sycophancy, and generic conclusions.
+- Use sentence-case headings. Use periods or commas instead of em dashes.
+- Preserve technical accuracy, the user's meaning, and the requested tone.
 
 ## General Instructions
 

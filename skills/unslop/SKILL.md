@@ -1,11 +1,12 @@
 ---
 name: unslop
-description: Cut AI tells from any writing. Must always apply.
+description: Edit user-facing prose to remove AI writing patterns and add a human voice. Use for explicit prose-writing or prose-revision tasks such as documentation, articles, release notes, PR descriptions, and product copy.
 license: MIT (see LICENSE)
 metadata:
   source-repository: https://github.com/cursor/plugins
   source-path: pstack/skills/unslop/SKILL.md
   source-commit: 99559f2f52047978602ef365589275831e76af07
+  source-adaptation: Narrowed model-invocation description; always-on rules live in config/pi/AGENTS.md
 ---
 
 # Unslop
