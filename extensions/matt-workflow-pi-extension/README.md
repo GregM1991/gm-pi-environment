@@ -288,7 +288,7 @@ Routing-aware commands hard-stop on invalid config, missing selected routed skil
 - Track the vendored upstream source in `vendor/mattpocock-skills/SOURCE.json`.
 - Refresh vendored upstream skills with `bun run sync:matt-skills`; preview the source ref with `bun run sync:matt-skills:dry-run`.
 - Put local Matt workflow policy in `augmentations/<phase>.md`; upstream Matt skills remain the base workflow, and matching local augmentations win on conflict.
-- All upstream category directories except `deprecated` are discovered dynamically, vendored, and registered as Pi skill paths. The vendored copy is the canonical source for Matt's skills across the whole environment; they are not duplicated in the environment's `skills/` directory.
+- Skill Sync preserves every upstream category except `deprecated` as an exact, inspectable vendored copy. Normal Pi discovery deliberately promotes only `engineering` and `productivity`; `misc`, `in-progress`, and any future unpromoted categories remain vendored without entering the runtime skill catalog. The vendored copy is canonical for Matt's skills across the whole environment, so they are not duplicated in the environment's `skills/` directory.
 - Vendored skills are exact upstream copies, including upstream's `disable-model-invocation` choices: skills upstream marks user-invoked stay user-invoked here.
 
 Inspect mapping with:

@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildConventionsContext, formatConventionsDiagnostics, scaffoldConventions } from "./conventions/config";
@@ -31,16 +31,7 @@ const PHASES: Phase[] = ["intake", "grill", "wayfinder", "spec", "refactors", "t
 const EXTENSION_ROOT = path.dirname(fileURLToPath(import.meta.url));
 const MATT_VENDOR_ROOT = path.join(EXTENSION_ROOT, "vendor", "mattpocock-skills");
 const AUGMENTATIONS_ROOT = path.join(EXTENSION_ROOT, "augmentations");
-
-// Synced upstream categories (all except deprecated); vendor is the canonical
-// copy of Matt's skills, so none of these are duplicated in the environment's skills/.
-function mattVendorCategories(): string[] {
-	if (!existsSync(MATT_VENDOR_ROOT)) return [];
-	return readdirSync(MATT_VENDOR_ROOT, { withFileTypes: true })
-		.filter((entry) => entry.isDirectory() && entry.name !== "deprecated")
-		.map((entry) => entry.name)
-		.sort();
-}
+const PROMOTED_MATT_VENDOR_CATEGORIES = ["engineering", "productivity"] as const;
 
 const skill = (name: string, relativePath: string, useWhen: string): SkillRef => ({
 	name,
@@ -517,7 +508,7 @@ function architectureLensPrompt(args: string, cwd: string, conventionsContext = 
 
 export default function mattWorkflowExtension(pi: ExtensionAPI) {
 	pi.on("resources_discover", async () => {
-		const vendorCategoryPaths = mattVendorCategories().map((category) => path.join(MATT_VENDOR_ROOT, category));
+		const vendorCategoryPaths = PROMOTED_MATT_VENDOR_CATEGORIES.map((category) => path.join(MATT_VENDOR_ROOT, category));
 		const skillPaths = [workflowSkillPath(), ...vendorCategoryPaths].filter((skillPathForPi) => existsSync(skillPathForPi));
 		if (skillPaths.length === 0) return;
 		return { skillPaths };
