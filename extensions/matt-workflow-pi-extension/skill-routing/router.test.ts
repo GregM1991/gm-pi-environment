@@ -16,7 +16,7 @@ function writeSkill(root: string, relativePath: string): void {
 }
 
 function writeDefaults(): void {
-	for (const skillId of ["implement", "tdd", "code-review", "diagnosing-bugs", "codebase-design", "improve-codebase-architecture"]) {
+	for (const skillId of ["implement", "tdd", "code-review", "diagnosing-bugs", "codebase-design"]) {
 		writeSkill(extensionRoot, path.join("vendor", "mattpocock-skills", "engineering", skillId, "SKILL.md"));
 	}
 	for (const skillId of ["accessibility", "react-performance-guidelines", "testing-philosophy", "observability", "security-review"]) {
@@ -140,6 +140,11 @@ describe("skill routing formatters", () => {
 });
 
 describe("routeIssue", () => {
+	test("unattended worker and reviewer routing does not register improve-codebase-architecture", () => {
+		const context = buildRoutingContext(repoRoot, extensionRoot);
+		expect(context.skills.map((skill) => skill.id)).not.toContain("improve-codebase-architecture");
+	});
+
 	test("keeps worker baseline even when baseline skill is disabled", () => {
 		mkdirSync(path.join(repoRoot, ".pi"), { recursive: true });
 		writeFileSync(path.join(repoRoot, ".pi", "matt-skill-routes.json"), JSON.stringify({ version: 1, disabledSkills: ["tdd"] }), "utf8");

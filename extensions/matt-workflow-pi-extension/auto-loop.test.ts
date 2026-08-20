@@ -10,6 +10,15 @@ function withRepo(run: (cwd: string) => void): void {
 }
 
 describe("planning phase contracts", () => {
+	test("grill exposes its wrapper and required grilling primitive while refactors retain architecture guidance", () => withRepo((cwd) => {
+		const grill = phasePrompt("grill", "#1", cwd);
+		const refactors = phasePrompt("refactors", "#1", cwd);
+		expect(grill).toContain("engineering/grill-with-docs/SKILL.md");
+		expect(grill).toContain("productivity/grilling/SKILL.md");
+		expect(grill).toContain("engineering/improve-codebase-architecture/SKILL.md");
+		expect(refactors).toContain("engineering/improve-codebase-architecture/SKILL.md");
+	}));
+
 	test("spec uses current upstream skill and preserves local gates", () => withRepo((cwd) => {
 		const prompt = phasePrompt("spec", "#1", cwd);
 		expect(prompt).toContain("engineering/to-spec/SKILL.md");
@@ -41,6 +50,13 @@ describe("planning phase contracts", () => {
 });
 
 describe("Wayfinder automation boundaries", () => {
+	test("unattended review and auto phase packs exclude child-orchestrating architecture guidance", () => withRepo((cwd) => {
+		const review = phasePrompt("review", "#42", cwd);
+		const auto = phasePrompt("auto", "ready-for-agent", cwd);
+		expect(review).not.toContain("improve-codebase-architecture/SKILL.md");
+		expect(auto).not.toContain("improve-codebase-architecture/SKILL.md");
+	}));
+
 	test("classifies every Wayfinder label case-insensitively", () => {
 		for (const label of ["wayfinder:map", "wayfinder:research", "wayfinder:prototype", "wayfinder:grilling", "wayfinder:task", "WayFinder:Research"]) {
 			expect(isWayfinderPlanningIssue({ labels: [label] })).toBe(true);

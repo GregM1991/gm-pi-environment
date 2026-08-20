@@ -47,13 +47,6 @@ export const DEFAULT_SKILLS: SkillRegistryEntry[] = [
 		resolver: { type: "extension-vendor", relativePath: "codebase-design/SKILL.md" },
 	},
 	{
-		id: "improve-codebase-architecture",
-		title: "Improve Codebase Architecture",
-		compatibility: ["worker", "review"],
-		safety: "allowlisted",
-		resolver: { type: "extension-vendor", relativePath: "improve-codebase-architecture/SKILL.md" },
-	},
-	{
 		id: "accessibility",
 		title: "Accessibility",
 		compatibility: ["worker", "review"],

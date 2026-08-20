@@ -63,6 +63,7 @@ const PHASE_SKILLS: Record<PhaseWithStatus, SkillRef[]> = {
 	],
 	grill: [
 		skill("grill-with-docs", "engineering/grill-with-docs/SKILL.md", "codebase work that should challenge plans against CONTEXT.md and ADRs"),
+		skill("grilling", "productivity/grilling/SKILL.md", "the breadth-first questioning primitive required by the grill-with-docs wrapper"),
 		skill("domain-modeling", "engineering/domain-modeling/SKILL.md", "pinning down domain terminology or a ubiquitous language during alignment"),
 		skill("research", "engineering/research/SKILL.md", "delegating primary-source docs/API research to a background agent while grilling continues"),
 		skill("prototype", "engineering/prototype/SKILL.md", "a throwaway prototype would flush out a design before committing"),
@@ -99,7 +100,6 @@ const PHASE_SKILLS: Record<PhaseWithStatus, SkillRef[]> = {
 	review: [
 		skill("code-review", "engineering/code-review/SKILL.md", "two-axis Standards/Spec review of the diff against a fixed point"),
 		skill("codebase-design", "engineering/codebase-design/SKILL.md", "review needs deep-module vocabulary or interface-quality assessment"),
-		skill("improve-codebase-architecture", "engineering/improve-codebase-architecture/SKILL.md", "review identifies architecture/deep-module improvement opportunities"),
 		skill("diagnosing-bugs", "engineering/diagnosing-bugs/SKILL.md", "review finds a hard bug requiring disciplined reproduction"),
 	],
 	closeout: [
@@ -112,7 +112,6 @@ const PHASE_SKILLS: Record<PhaseWithStatus, SkillRef[]> = {
 		skill("code-review", "engineering/code-review/SKILL.md", "review child contracts: two-axis Standards/Spec review of each issue's diff"),
 		skill("diagnosing-bugs", "engineering/diagnosing-bugs/SKILL.md", "worker or review loops hit hard bugs or regressions"),
 		skill("codebase-design", "engineering/codebase-design/SKILL.md", "review detects interface or deep-module design issues that should stop auto mode"),
-		skill("improve-codebase-architecture", "engineering/improve-codebase-architecture/SKILL.md", "review detects architectural issues that should stop auto mode"),
 	],
 	retro: [],
 	status: [
