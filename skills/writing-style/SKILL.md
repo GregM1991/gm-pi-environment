@@ -1,6 +1,6 @@
 ---
 name: writing-style
-description: Greg's writing voice and style profile. Use when drafting a PR body via `/write-pr`, or when asked to write or rewrite text in Greg's voice.
+description: Greg's writing voice and style profile. Use when drafting a PR body, Jira tickets, or when asked to write or rewrite text in Greg's voice.
 ---
 
 # Writing Style Profile
