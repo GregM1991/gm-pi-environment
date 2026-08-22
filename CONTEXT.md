@@ -75,7 +75,7 @@ An unattended single-issue implementation run against an unblocked ready-for-age
 _Avoid_: interactive implementation session
 
 **Auto Loop**:
-The continuous orchestration mode that implements, reviews, commits, and closes ready-for-agent issues serially until a stop rule fires. Parent/PRD issues expand into their child queue and are never implemented or closed directly.
+The continuous orchestration mode that implements, reviews, commits, publishes through the repository's normal delivery hooks, and closes ready-for-agent issues serially until a stop rule fires. Parent/PRD issues expand into their child queue and are never implemented or closed directly.
 _Avoid_: parallel workers, parent auto-close
 
 **Planning Pass**:
@@ -95,7 +95,7 @@ The session running the Auto Loop. It resolves the queue and launches fresh chil
 _Avoid_: worker-orchestrator hybrid
 
 **Completion Evidence**:
-The verification artifacts — diff/commits, test results, review findings — required before closeout may close an issue. Missing evidence means relabel and stop, not close.
+The verification artifacts — final diff/commit, test results, review findings, and confirmed publication of the exact final commit through the repository's normal delivery hooks — required before closeout may close an issue. Missing or stale evidence means relabel and stop, not close.
 _Avoid_: claimed done, vibes-based closeout
 
 **Review Run**:

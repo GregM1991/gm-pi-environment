@@ -23,7 +23,7 @@ Update the same packet when diff or verification evidence changes. Every child c
 
 ## Verification evidence
 
-Keep complete verification output in `.pi/matt-verification/<issue>-<stage>.log`. Valid stage names are `<issue>-initial.log`, `<issue>-fix-<n>.log`, and `<issue>-pre-commit.log`, where `<n>` is the fix-cycle number.
+Keep complete orchestrator-run verification output in `.pi/matt-verification/<issue>-<stage>.log`. Valid stage names are `<issue>-initial.log`, `<issue>-fix-<n>.log`, and `<issue>-pre-push.log`, where `<n>` is the fix-cycle number. The normal pre-push hook writes to its invoking terminal rather than one of these logs; publication success is the evidence that its gate passed.
 
 Before writing logs, ensure `.pi/matt-verification/` is ignored by Git; use the repo-local `.git/info/exclude` when the target repo does not already ignore it. Create the directory with mode `0700` and each log with mode `0600`, correcting existing modes before use.
 
@@ -31,9 +31,9 @@ Child handoffs contain only the pass/fail summary, failing cases, and log path. 
 
 ### Verification invalidation
 
-Use focused tests during intermediate edits. Run the complete repo check once when an implementation pass or fix cycle is complete. That check remains valid for pre-commit while code and verification-relevant inputs are unchanged. Review results, ledger appends, compact summaries, packet updates, and log bookkeeping do not invalidate it.
+Use focused tests during intermediate edits. Run the complete repo check once when an implementation pass or fix cycle is complete. That check remains valid for commit preparation while code and verification-relevant inputs are unchanged. Review results, ledger appends, compact summaries, packet updates, and log bookkeeping do not invalidate it.
 
-After remediation, code changes, or another verification-relevant input change, rerun the complete check immediately before commit and write its output to the pre-commit log. Never require two identical consecutive complete checks.
+After remediation, code changes, or another verification-relevant input change, rerun the complete check before updating the final issue commit and write its output to the pre-push log. Never require two identical consecutive orchestrator-run complete checks. This evidence does not replace the final normal push: the target repository's pre-push hook remains the publication boundary and must pass against the exact commit that will be closed out.
 
 ## Cleanup
 

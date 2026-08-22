@@ -81,7 +81,7 @@ describe("Wayfinder automation boundaries", () => {
 		expect(auto).toContain("Loop contract (each iteration, in order)");
 		expect(auto).toContain("Never implement or close a parent/spec/container issue");
 		expect(auto).toContain("at most three fix/review cycles per issue");
-		expect(auto).toContain("10. Run closeout:");
+		expect(auto).toContain("11. Run closeout only after confirmed publication:");
 		expect(auto).toContain("compact loop log");
 		expect(auto.indexOf(artifactReference)).toBeGreaterThan(auto.indexOf("5. Route the selected issue"));
 		expect(auto.indexOf(childReference)).toBeGreaterThan(auto.indexOf("6. Launch a fresh implementation child"));
@@ -190,7 +190,8 @@ describe("Wayfinder automation boundaries", () => {
 
 		expect(auto).toContain(`use the verification-invalidation rules in ${artifactReference}`);
 		expect(artifacts).toContain("`.pi/matt-verification/<issue>-<stage>.log`");
-		expect(artifacts).toContain("`<issue>-initial.log`, `<issue>-fix-<n>.log`, and `<issue>-pre-commit.log`");
+		expect(artifacts).toContain("`<issue>-initial.log`, `<issue>-fix-<n>.log`, and `<issue>-pre-push.log`");
+		expect(artifacts).not.toContain("<issue>-pre-commit.log");
 		expect(artifacts).toContain("repo-local `.git/info/exclude`");
 		expect(artifacts).toContain("mode `0700`");
 		expect(artifacts).toContain("mode `0600`");
@@ -215,9 +216,29 @@ describe("Wayfinder automation boundaries", () => {
 		expect(auto).toContain("never commit on a failing check");
 		expect(auto).toContain("A failed rerun re-enters the fix/review cycle while budget remains");
 		expect(auto).toContain("otherwise stop as budget exhausted");
-		expect(artifacts).toContain("That check remains valid for pre-commit while code and verification-relevant inputs are unchanged");
+		expect(artifacts).toContain("That check remains valid for commit preparation while code and verification-relevant inputs are unchanged");
 		expect(artifacts).toContain("Review results, ledger appends, compact summaries, packet updates, and log bookkeeping do not invalidate it");
-		expect(artifacts).toContain("Never require two identical consecutive complete checks");
+		expect(artifacts).toContain("Never require two identical consecutive orchestrator-run complete checks");
+	}));
+
+	test("auto publishes a hook-verified final commit before closeout without bypass", () => withRepo((cwd) => {
+		const auto = phasePrompt("auto", "ready-for-agent", cwd);
+		const commit = auto.indexOf("9. After review passes");
+		const publication = auto.indexOf("10. Publish the final issue commit");
+		const closeout = auto.indexOf("11. Run closeout only after confirmed publication:");
+
+		expect(commit).toBeGreaterThan(-1);
+		expect(commit).toBeLessThan(publication);
+		expect(publication).toBeLessThan(closeout);
+		expect(auto).toContain("Never use `git push --no-verify`, `git commit --no-verify`, or any equivalent hook bypass");
+		expect(auto).toContain("A failed pre-push hook blocks closeout");
+		expect(auto).toContain("re-enters the fix/review/commit cycle while budget remains");
+		expect(auto).toContain("a later fix must be committed and pushed again");
+		expect(auto).toContain("stage only issue-owned paths plus issue-owned ledger evidence");
+		expect(auto).toContain("stop on ambiguous staged, tracked, or relevant untracked changes");
+		expect(auto).toContain("or push/PR publication fails, preserve the local commit and leave the issue open");
+		expect(auto).toContain("normal push whose pre-push hook passed");
+		expect(auto).toContain("pushed final commit or its pull request");
 	}));
 
 	test("auto prompt points to the append-only Review Ledger lifecycle owner", () => withRepo((cwd) => {
@@ -257,20 +278,24 @@ describe("Wayfinder automation boundaries", () => {
 		const ledger = readAutoReference("auto-review-ledger");
 		const artifacts = readAutoReference("auto-artifacts");
 		const commit = auto.indexOf("9. After review passes");
-		const gate = auto.indexOf("9a. Before closeout");
-		const closeout = auto.indexOf("10. Run closeout:");
+		const gate = auto.indexOf("9a. Before publication");
+		const publication = auto.indexOf("10. Publish the final issue commit");
+		const closeout = auto.indexOf("11. Run closeout only after confirmed publication:");
 
 		expect(auto).toContain(`read ${ledgerReference}, then run the configured AI gate exactly once for this issue after its commit exists`);
 		expect(auto).toContain("Append its source-tagged outcome and update the same issue commit");
 		expect(auto).toContain("FIX or a concrete remediable BLOCKER enters a fix-worker plus fresh-review cycle while budget remains");
 		expect(auto).toContain("never rerun the gate");
+		expect(auto).toContain("without bypassing hooks");
+		expect(auto).toContain("If HEAD moved or unrelated work makes updating the commit unsafe");
 		expect(auto).toContain("exhausted three-cycle budget stops without closing");
 		expect(commit).toBeGreaterThan(-1);
 		expect(commit).toBeLessThan(gate);
-		expect(gate).toBeLessThan(closeout);
+		expect(gate).toBeLessThan(publication);
+		expect(publication).toBeLessThan(closeout);
 
 		expect(ledger).toContain("run it exactly once per issue");
-		expect(ledger).toContain("after the issue's review has passed and its commit exists, but before closeout");
+		expect(ledger).toContain("after the issue's review has passed and its commit exists, but before publication and closeout");
 		expect(ledger).toContain("Do not run it after review children");
 		expect(ledger).toContain('source: "ai-gate"');
 		expect(ledger).toContain("no findings → `PASS`");
@@ -375,6 +400,28 @@ describe("resource discovery", () => {
 });
 
 describe("command registration", () => {
+	test("describes verified publication in auto command and help surfaces", async () => {
+		type RegisteredCommand = {
+			description: string;
+			handler: (args: string, ctx: { ui: { notify: (message: string) => void } }) => Promise<void>;
+		};
+		let auto: RegisteredCommand | undefined;
+		let help: RegisteredCommand | undefined;
+		const messages: string[] = [];
+		mattWorkflowExtension({
+			on() {},
+			registerCommand(name: string, command: RegisteredCommand) {
+				if (name === "matt-auto") auto = command;
+				if (name === "matt-help") help = command;
+			},
+		} as never);
+
+		await help?.handler("", { ui: { notify(message: string) { messages.push(message); } } });
+
+		expect(auto?.description).toContain("implement, review, commit, publish, and close");
+		expect(messages[0]).toContain("implement, review, commit, publish, and close");
+	});
+
 	test("always-discovered router contains only universal invariants and precise Phase-reference guidance", () => withRepo((cwd) => {
 		const router = readFileSync(path.join(import.meta.dir, "skills", "matt-workflow", "SKILL.md"), "utf8");
 		const grill = phasePrompt("grill", "#42", cwd);
