@@ -71,7 +71,7 @@ When classifying a v2 finding as `repeat: "earlier-issue"`, first compare it by 
 
 ## AI-gate capture and verdict mapping
 
-When `toolchain.commands.aiGate` is configured, run it exactly once per issue, after the issue's review has passed and its commit exists, but before closeout. Do not run it after review children. Capture its outcome separately with `source: "ai-gate"`, using the latest completed review cycle and the v2 record shape.
+When `toolchain.commands.aiGate` is configured, run it exactly once per issue, after the issue's review has passed and its commit exists, but before publication and closeout. Do not run it after review children. Capture its outcome separately with `source: "ai-gate"`, using the latest completed review cycle and the v2 record shape.
 
 Map gate results deterministically:
 
@@ -83,7 +83,7 @@ Append one record per novel gate finding, assigning one run UUID to the gate exe
 
 Every finding requires a primary `file:line`. When gate output supplies only a file path, inspect its evidence and the committed issue diff to choose the most specific implicated line; if no narrower line can be established, use line 1. When execution/parsing fails without an implicated repo file, use `.pi/matt-conventions.json:1`, where the command is configured.
 
-Use the active implementation/fix worker skill pack on AI-gate finding records. Combine the gate outcome with the review evidence for closeout: `BLOCKER` takes precedence over `FIX`, which takes precedence over `PASS`. A gate `FIX` or concrete remediable `BLOCKER` triggers a fix worker and fresh review while fewer than three fix/review cycles have been used. If all three cycles have already been consumed, stop with the budget-exhausted reason and do not close the issue. The fix worker's completed full check satisfies the mandatory post-remediation/pre-commit verification requirement unless code or verification-relevant inputs change afterward; the fresh review and ledger bookkeeping do not invalidate it, so do not require a second identical complete check before updating the issue commit. Do not run the gate again after that review; a non-remediable gate failure blocks closeout.
+Use the active implementation/fix worker skill pack on AI-gate finding records. Combine the gate outcome with the review evidence for closeout: `BLOCKER` takes precedence over `FIX`, which takes precedence over `PASS`. A gate `FIX` or concrete remediable `BLOCKER` triggers a fix worker and fresh review while fewer than three fix/review cycles have been used. If all three cycles have already been consumed, stop with the budget-exhausted reason and do not close the issue. The fix worker's completed full check satisfies the mandatory post-remediation commit-preparation requirement unless code or verification-relevant inputs change afterward; the fresh review and ledger bookkeeping do not invalidate it, so do not require a second identical orchestrator-run complete check before updating the issue commit. Do not run the gate again after that review. The updated commit must still pass the target repository's normal pre-push hook and be published before closeout; a non-remediable gate failure blocks closeout.
 
 ## Per-issue duplicate policy
 
