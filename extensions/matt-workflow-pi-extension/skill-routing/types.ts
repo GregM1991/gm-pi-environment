@@ -1,10 +1,10 @@
 export type AgentRole = "worker" | "review";
 export type Confidence = "low" | "medium" | "high";
-export type SkillSource = "extension-vendor" | "workspace" | "repo";
+export type SkillSource = "extension-vendor" | "global" | "repo";
 
 export type SkillResolver =
 	| { type: "extension-vendor"; relativePath: string }
-	| { type: "workspace"; relativePath: string }
+	| { type: "global"; relativePath: string }
 	| { type: "repo"; relativePath: string };
 
 export type SkillRegistryEntry = {

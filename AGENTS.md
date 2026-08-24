@@ -2,16 +2,16 @@
 
 ## Purpose and Source of Truth
 
-- This repository is the canonical, portable Pi environment for shared skills, extensions, prompts, themes, references, and base configuration.
+- This repository is the canonical, portable Pi environment for extensions, prompts, themes, references, and base configuration. It does not ship general-purpose skills.
+- `GregM1991/skills` is the canonical source for general-purpose skills. Install them into `~/.agents/skills` with `npx skills add GregM1991/skills --all -g`, and update them with `npx skills update`.
 - Perform all work that improves, changes, alters, or adjusts this Pi environment package or its Pi-consumed extensions in this repository checkout. Never edit the installed/runtime copy under `~/.pi/agent/git/github.com/GregM1991/gm-pi-environment` (or any other Pi harness package cache); publish or reinstall from this repository instead.
 - Install and register this Pi package from `git:github.com/GregM1991/gm-pi-environment`, not from a local cloned repository path. Use the clone for editing and publishing only.
 - Read `README.md` before changing installation, bootstrap, package-loading, or machine-local configuration behavior.
-- Keep shared resources here. Do not create duplicate same-named copies in `~/.agents/skills` or another Pi load path.
+- Keep package-provided resources other than general-purpose skills here. Do not create duplicate same-named general-purpose skills in this repository or another Pi load path.
 - `config/pi/AGENTS.md` is the global instruction file copied into a user's Pi directory by `bin/bootstrap.sh`; this root `AGENTS.md` contains contributor instructions for this repository. Do not conflate their roles.
 
 ## Repository Layout
 
-- `skills/<name>/SKILL.md` — reusable shared skills and their colocated references/scripts.
 - `extensions/<name>/` — Pi extensions. Follow each extension's `README.md` and `package.json`.
 - `extensions/matt-workflow-pi-extension/augmentations/` — local Matt workflow policy.
 - `extensions/matt-workflow-pi-extension/vendor/mattpocock-skills/` — upstream-owned vendored content; treat it as read-only.
@@ -25,7 +25,7 @@
 - Use TypeScript ES modules for extensions and follow the nearest extension's existing Pi API patterns.
 - Keep extension entry points at `extensions/<name>/index.ts` so the root `pi.extensions` glob continues to discover them.
 - Keep tests colocated as `*.test.ts`; update or add behavior-focused tests when extension behavior changes.
-- Keep skills focused and self-contained. Put reusable instructions in `SKILL.md`, and resolve referenced relative files from the skill directory.
+- Keep project-specific `.pi/skills` focused and self-contained. Put reusable instructions in `SKILL.md`, and resolve referenced relative files from the skill directory.
 - Put phase-scoped local workflow changes under Matt `augmentations/`; put focused policy shared across steps or phases under `docs/agents/` and reach it through precise prompt pointers. Do not hand-edit vendored Matt skills.
 - Refresh vendored Matt content only through the extension's sync scripts, then inspect `SOURCE.json` and the resulting diff.
 - Record significant, durable architecture changes in `docs/adr/` and update relevant README files when user-facing commands or setup change.
@@ -62,6 +62,5 @@ Run the smallest relevant command while iterating, then all checks for the areas
 - Never commit credentials, auth state, generated Pi runtime state, `.env*`, or machine-local `*.local.json` files.
 - Keep machine-specific settings and MCP servers in the overlays documented in `README.md`; arrays replace base arrays during bootstrap merges.
 - Do not run `bin/bootstrap.sh` unless the user explicitly asks: it backs up and rewrites live Pi configuration, installs this package, and updates extensions.
-- Do not run `bin/empty-system-skills-dir.sh` unless explicitly asked: it backs up and removes entries from the configured system skills directory.
 - Do not manually edit `package-lock.json` or generated/vendor files. Regenerate them only through the command responsible for the underlying change.
 - Do not commit changes unless the user explicitly requests a commit.

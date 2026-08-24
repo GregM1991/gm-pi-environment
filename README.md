@@ -2,18 +2,16 @@
 
 Personal source of truth for Pi setup across machines for moi.
 
-This repo contains shared Pi skills, personal extensions, and portable config so I can try keep track of the ever moving landscape.
+This repo contains personal Pi extensions and portable config so I can try keep track of the ever moving landscape. General-purpose skills come from [`GregM1991/skills`](https://github.com/GregM1991/skills).
 
 ## Contents
 
-- `skills/` — shared skills that should be available everywhere Pi is used.
 - `extensions/` — personal Pi extensions folded into this environment package, including first-class `fd` and `rg` search tools.
 - `prompts/` — shared prompt templates.
 - `config/pi/AGENTS.md` — global Pi agent instructions.
 - `config/pi/settings.base.json` — portable global Pi settings and standard packages. Machine-specific models and other overrides belong in the local overlay described below.
 - `config/pi/mcp.json` — portable MCP config. Machine-specific servers and credentials belong in the local overlay described below.
 - `bin/bootstrap.sh` — install/apply this environment, merge optional machine-local configuration, and reconcile packages.
-- `bin/empty-system-skills-dir.sh` — keep `~/.agents/skills` as a local-only scratch dir by emptying it after backup.
 
 ## Install from GitHub
 
@@ -36,7 +34,15 @@ git clone https://github.com/GregM1991/gm-pi-environment.git ~/workspace/pi-envi
 PI_ENV_PACKAGE_SOURCE="$HOME/workspace/pi-environment" "$HOME/workspace/pi-environment/bin/bootstrap.sh"
 ```
 
-The repository copy is canonical for package-provided extensions, skills, and prompts. Do not also load workspace or `~/.agents/skills` copies with the same names.
+This repository is canonical for its package-provided extensions and prompts. It does not ship general-purpose skills.
+
+Install the canonical general-purpose skill library separately:
+
+```bash
+npx skills add GregM1991/skills --all -g
+```
+
+The Skills CLI installs it under `~/.agents/skills`. Use `npx skills update` for ongoing updates.
 
 ## Machine-local configuration
 
@@ -88,8 +94,8 @@ The `context-breadcrumbs` extension wraps `pi-context-breadcrumbs` so user-level
 
 Mindspace prompts and other machine-specific prompts may remain in `~/.pi/agent/prompts`. Shared prompts belong in this repository.
 
-### Local-only skills
+### Skills
 
-After migration, `~/.agents/skills` is intentionally kept as a per-system scratch/override directory. Shared skills belong in this repo under `skills/`.
+`GregM1991/skills` is the single canonical source for general-purpose skills on all machines. The Skills CLI manages those skills in `~/.agents/skills`.
 
-Avoid placing same-named skills in `~/.agents/skills`, because Pi will report collisions and only one copy will win. When a name exists in both places, remove the local copy and use this repository as the source of truth.
+Keep project-specific skills in the target project's `.pi/skills/` directory. Avoid duplicate names across skill locations because Pi keeps only the first skill it finds.

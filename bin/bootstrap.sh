@@ -87,7 +87,8 @@ cp "$REPO_ROOT/config/pi/AGENTS.md" "$PI_DIR/AGENTS.md"
 cp "$TMP_DIR/mcp.json" "$PI_DIR/mcp.json"
 cp "$TMP_DIR/settings.json" "$PI_DIR/settings.json"
 
-# Register this environment as the Pi package providing skills/extensions.
+# Register this environment as the Pi package providing extensions, prompts, and themes.
+# General-purpose skills are installed separately from GregM1991/skills with the Skills CLI.
 # Defaults to the GitHub source so fresh machines stay updateable via `pi update --extensions`.
 # For local development, run: PI_ENV_PACKAGE_SOURCE="$REPO_ROOT" ./bin/bootstrap.sh
 pi install "$PACKAGE_SOURCE"
@@ -101,6 +102,6 @@ Machine-local overrides, when needed, are read from:
   $SETTINGS_OVERLAY
   $MCP_OVERLAY
 
-Run this if you want ~/.agents/skills to be local-only/empty on this machine:
-  $REPO_ROOT/bin/empty-system-skills-dir.sh
+Install general-purpose skills separately:
+  npx skills add GregM1991/skills --all -g
 MSG

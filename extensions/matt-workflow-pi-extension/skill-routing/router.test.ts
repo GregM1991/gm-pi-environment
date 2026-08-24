@@ -2,12 +2,13 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { buildRoutingContext, scaffoldSkillRoutesJson } from "./config";
+import { buildRoutingContext as buildRoutingContextWithRoots, scaffoldSkillRoutesJson } from "./config";
 import { formatDryRun, formatRoutingPromptContract, formatTicketSkillHintInstructions } from "./format";
 import { routeIssue } from "./router";
 
 let repoRoot = "";
 let extensionRoot = "";
+let globalSkillsRoot = "";
 
 function writeSkill(root: string, relativePath: string): void {
 	const target = path.join(root, relativePath);
@@ -20,14 +21,19 @@ function writeDefaults(): void {
 		writeSkill(extensionRoot, path.join("vendor", "mattpocock-skills", "engineering", skillId, "SKILL.md"));
 	}
 	for (const skillId of ["accessibility", "react-performance-guidelines", "testing-philosophy", "observability", "security-review"]) {
-		writeSkill(path.resolve(extensionRoot, "..", "..", "skills"), path.join(skillId, "SKILL.md"));
+		writeSkill(globalSkillsRoot, path.join(skillId, "SKILL.md"));
 	}
+}
+
+function buildRoutingContext(repo: string, extension: string) {
+	return buildRoutingContextWithRoots(repo, extension, globalSkillsRoot);
 }
 
 beforeEach(() => {
 	const root = mkdtempSync(path.join(tmpdir(), "matt-routing-test-"));
 	repoRoot = path.join(root, "repo");
 	extensionRoot = path.join(root, "env", "extensions", "matt-workflow-pi-extension");
+	globalSkillsRoot = path.join(root, ".agents", "skills");
 	mkdirSync(repoRoot, { recursive: true });
 	writeDefaults();
 });
@@ -55,7 +61,7 @@ describe("skill routing config", () => {
 			JSON.stringify({
 				version: 1,
 				limits: { workerMaxRoutedSkills: 0 },
-				skills: [{ id: "bad", compatibility: ["worker"], safety: "allowlisted", resolver: { type: "workspace", relativePath: "bad/SKILL.md" } }],
+				skills: [{ id: "bad", compatibility: ["worker"], safety: "allowlisted", resolver: { type: "global", relativePath: "bad/SKILL.md" } }],
 				routes: [],
 			}),
 			"utf8",
@@ -127,7 +133,7 @@ describe("skill routing formatters", () => {
 		expect(formatted).toContain("Worker skill pack:");
 		expect(formatted).toContain("Review skill pack:");
 		expect(formatted).toContain("- accessibility (high) routes=accessibility");
-		expect(formatted).toContain(path.join(path.resolve(extensionRoot, "..", "..", "skills"), "accessibility", "SKILL.md"));
+		expect(formatted).toContain(path.join(globalSkillsRoot, "accessibility", "SKILL.md"));
 		expect(formatted).toContain("Skill adjustments: none");
 	});
 

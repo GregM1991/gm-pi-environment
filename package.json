@@ -2,11 +2,10 @@
   "name": "gm-pi-environment",
   "version": "0.1.0",
   "private": true,
-  "description": "Personal Pi environment: shared skills, extensions, prompts, themes, and portable config.",
+  "description": "Personal Pi environment: extensions, prompts, themes, and portable config.",
   "keywords": ["pi-package"],
   "pi": {
     "skills": [
-      "./skills",
       "./extensions/matt-workflow-pi-extension/skills"
     ],
     "extensions": [

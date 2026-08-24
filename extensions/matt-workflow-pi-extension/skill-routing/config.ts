@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import path from "node:path";
 import { BASELINE_SKILLS, DEFAULT_LIMITS, DEFAULT_ROUTES, DEFAULT_SKILLS } from "./defaults";
 import type {
@@ -112,8 +113,8 @@ function validateResolver(value: unknown, errors: ValidationDiagnostic[], pathNa
 	for (const key of Object.keys(value)) {
 		if (!RESOLVER_KEYS.has(key)) errors.push(diagnostic("unknown-resolver-field", `Unknown resolver field '${key}'.`, `${pathName}.${key}`));
 	}
-	if (value.type !== "extension-vendor" && value.type !== "workspace" && value.type !== "repo") {
-		errors.push(diagnostic("invalid-resolver-type", "resolver.type must be extension-vendor, workspace, or repo.", `${pathName}.type`));
+	if (value.type !== "extension-vendor" && value.type !== "global" && value.type !== "repo") {
+		errors.push(diagnostic("invalid-resolver-type", "resolver.type must be extension-vendor, global, or repo.", `${pathName}.type`));
 		return undefined;
 	}
 	if (typeof value.relativePath !== "string" || value.relativePath.trim().length === 0) {
@@ -254,19 +255,19 @@ function parseRepoConfig(repoRoot: string, configPath: string): { config?: Skill
 	};
 }
 
-function resolveSkill(entry: SkillRegistryEntry, repoRoot: string, extensionRoot: string): ResolvedSkill {
+function resolveSkill(entry: SkillRegistryEntry, repoRoot: string, extensionRoot: string, globalSkillsRoot: string): ResolvedSkill {
 	let absolutePath: string;
 	if (entry.resolver.type === "extension-vendor") {
 		absolutePath = path.join(extensionRoot, "vendor", "mattpocock-skills", "engineering", entry.resolver.relativePath);
-	} else if (entry.resolver.type === "workspace") {
-		absolutePath = path.resolve(extensionRoot, "..", "..", "skills", entry.resolver.relativePath);
+	} else if (entry.resolver.type === "global") {
+		absolutePath = path.resolve(globalSkillsRoot, entry.resolver.relativePath);
 	} else {
 		absolutePath = path.resolve(repoRoot, entry.resolver.relativePath);
 	}
 	return { ...entry, absolutePath, available: existsSync(absolutePath) };
 }
 
-export function buildRoutingContext(repoRoot: string, extensionRoot: string): RoutingContext {
+export function buildRoutingContext(repoRoot: string, extensionRoot: string, globalSkillsRoot = path.join(homedir(), ".agents", "skills")): RoutingContext {
 	const configPath = configPathFor(repoRoot);
 	const parsed = parseRepoConfig(repoRoot, configPath);
 	const diagnostics = [...parsed.diagnostics];
@@ -298,7 +299,7 @@ export function buildRoutingContext(repoRoot: string, extensionRoot: string): Ro
 		}
 	}
 
-	const resolvedSkills = skills.map((entry) => resolveSkill(entry, repoRoot, extensionRoot));
+	const resolvedSkills = skills.map((entry) => resolveSkill(entry, repoRoot, extensionRoot, globalSkillsRoot));
 	const routedBaselineIds = new Set(Object.values(BASELINE_SKILLS).flat());
 	for (const skill of resolvedSkills) {
 		if (routedBaselineIds.has(skill.id) && !skill.available) {

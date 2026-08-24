@@ -1,26 +1,26 @@
 # Pi Environment
 
-This context describes the personal Pi agent environment: a portable package of skills, extensions, prompts, and config used to orchestrate AI-assisted product development across machines, with the Matt workflow extension as the product pipeline.
+This context describes the personal Pi agent environment: a portable package of extensions, prompts, and config used to orchestrate AI-assisted product development across machines, with the Matt workflow extension as the product pipeline.
 
 ## Language
 
 ### Environment & Distribution
 
 **Pi Environment**:
-The personal source-of-truth repo of shared skills, extensions, prompts, and portable config, installed as a Pi package on every machine.
-_Avoid_: dotfiles repo, config backup
+The personal source-of-truth repo of extensions, prompts, and portable config, installed as a Pi package on every machine. General-purpose skills come from the Shared Skill Library.
+_Avoid_: general-purpose skill source, dotfiles repo, config backup
 
 **Bootstrap**:
 Applying the Pi Environment to a machine: copying global agent config and registering the environment package so `pi update --extensions` can reconcile it.
 _Avoid_: manual setup, machine-local drift
 
 **Shared Skill Library**:
-The curated `skills/` directory available in every Pi session. Each skill owns exactly one Job; anything Matt's upstream repo owns is consumed from the Vendored Matt Skills instead of being copied here.
-_Avoid_: skill dump, duplicate copies of upstream skills
+The canonical `GregM1991/skills` repository, installed by the Skills CLI into `~/.agents/skills` for Pi and other harnesses. Each skill owns exactly one Job.
+_Avoid_: environment-package skills, duplicate skill sources
 
-**Local-only Skills**:
-The per-machine `~/.agents/skills` scratch directory for experiments and overrides. Shared skills never live there, and same-named skills there cause collisions where only one copy wins.
-_Avoid_: shared skills on a single machine
+**Project Skill**:
+A project-specific skill under the target project's `.pi/skills/` directory. It stays with that project instead of entering the Shared Skill Library.
+_Avoid_: general-purpose skill, machine-local duplicate
 
 ### Skills & Canonicality
 
@@ -219,5 +219,5 @@ A skill selected by active route config that is unavailable in the current Pi se
 _Avoid_: graceful fallback, unavailable warning only, hallucinated skill use
 
 **Skill Registry**:
-The active catalog of routeable skill IDs, compatibility, safety, and resolver metadata. It starts with extension-owned defaults and may be extended by repo-local config for project-specific skills. Extension defaults are small, high-signal, defined in TypeScript for type-checking, and include known high-value non-Matt workspace skills — accessibility, React performance, testing philosophy, observability, and review-only security review — with strict availability validation still applying. Repos add domain-specific breadth or disable defaults through repo-local JSON config. The registry does not hardcode absolute paths in persisted config; it stores stable IDs plus source/relative-path metadata and computes availability from the current Pi session, extension root, or repo root at runtime. Repo-defined skill resolvers are repo-relative local `SKILL.md` paths only, with `.pi/skills/<id>/SKILL.md` as the recommended convention. No remote URLs or shell-command resolvers.
+The active catalog of routeable skill IDs, compatibility, safety, and resolver metadata. It starts with extension-owned defaults and may be extended by repo-local config for project-specific skills. Extension defaults are small, high-signal, defined in TypeScript for type-checking, and include known high-value non-Matt global skills — accessibility, React performance, testing philosophy, observability, and review-only security review — with strict availability validation still applying. Repos add domain-specific breadth or disable defaults through repo-local JSON config. The registry does not hardcode absolute paths in persisted config; it stores stable IDs plus source/relative-path metadata and computes availability from `~/.agents/skills`, the extension root, or the repo root at runtime. Repo-defined skill resolvers are repo-relative local `SKILL.md` paths only, with `.pi/skills/<id>/SKILL.md` as the recommended convention. No remote URLs or shell-command resolvers.
 _Avoid_: extension-only skill catalog, persisted absolute paths, runtime-only opaque lookup, remote skill resolver, broad default route set

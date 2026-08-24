@@ -35,7 +35,6 @@ const MILESTONE_REFERENCE = path.join(EXTENSION_ROOT, "docs", "agents", "milesto
 const AUTO_ARTIFACTS_REFERENCE = path.join(EXTENSION_ROOT, "docs", "agents", "auto-artifacts.md");
 const AUTO_CHILD_CONTRACTS_REFERENCE = path.join(EXTENSION_ROOT, "docs", "agents", "auto-child-contracts.md");
 const AUTO_REVIEW_LEDGER_REFERENCE = path.join(EXTENSION_ROOT, "docs", "agents", "auto-review-ledger.md");
-const PROMOTED_MATT_VENDOR_CATEGORIES = ["engineering", "productivity"] as const;
 
 const skill = (name: string, relativePath: string, useWhen: string): SkillRef => ({
 	name,
@@ -168,7 +167,7 @@ function skillInstructions(phase: PhaseWithStatus): string {
 	}
 
 	return [
-		"Phase skills are loaded into Pi from the vendored mattpocock/skills folders and are also listed here with absolute paths for this phase.",
+		"Phase skills are private extension data and are listed here with precise absolute paths for this phase; they are not ambient Pi skills.",
 		"Use only the listed phase skills that actually apply to this target. If a listed skill does not fit the task, skip it and briefly say why.",
 		"Use only skills listed in this phase prompt or assigned to you via a skill pack (baseline plus routed skills); do not pull in other skills as workflow guidance on your own. Using Pi extension tools such as subagent orchestration is allowed when the phase prompt explicitly asks for orchestration.",
 		"Relevant phase upstream skill files:",
@@ -513,10 +512,9 @@ function architectureLensPrompt(args: string, cwd: string, conventionsContext = 
 
 export default function mattWorkflowExtension(pi: ExtensionAPI) {
 	pi.on("resources_discover", async () => {
-		const vendorCategoryPaths = PROMOTED_MATT_VENDOR_CATEGORIES.map((category) => path.join(MATT_VENDOR_ROOT, category));
-		const skillPaths = [workflowSkillPath(), ...vendorCategoryPaths].filter((skillPathForPi) => existsSync(skillPathForPi));
-		if (skillPaths.length === 0) return;
-		return { skillPaths };
+		const skillPath = workflowSkillPath();
+		if (!existsSync(skillPath)) return;
+		return { skillPaths: [skillPath] };
 	});
 
 	pi.on("session_start", async (_event, ctx) => {

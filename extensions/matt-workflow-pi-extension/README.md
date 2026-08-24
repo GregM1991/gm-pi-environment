@@ -270,16 +270,16 @@ Routing-aware commands hard-stop on invalid config, missing selected routed skil
 
 ## Skill policy
 
-- Always loads the local `matt-workflow` router; normal discovery additionally registers only the promoted vendor categories described below.
-- Phase prompts reference vendored Matt Pocock engineering skills under `vendor/mattpocock-skills/engineering/`.
+- Always loads the local `matt-workflow` router. Vendored Matt skills remain private extension data and never enter Pi's ambient skill catalog.
+- Phase prompts reference vendored Matt Pocock engineering skills under `vendor/mattpocock-skills/engineering/` by precise absolute path.
 - Phase prompts also reference local phase-scoped augmentation files under `augmentations/`.
 - Phase steps point to focused policy under `docs/agents/` when one Job spans multiple steps or Phase clients; these Agent References are binding when their branch fires.
 - Treat `vendor/mattpocock-skills/` as upstream-owned/read-only: do not put local workflow customizations there.
 - Track the vendored upstream source in `vendor/mattpocock-skills/SOURCE.json`.
 - Refresh vendored upstream skills with `bun run sync:matt-skills`; preview the source ref with `bun run sync:matt-skills:dry-run`.
 - Put phase-scoped Matt policy in `augmentations/<phase>.md`; put reusable step- or branch-scoped mechanics in focused `docs/agents/` references with precise prompt pointers. Upstream Matt skills remain the base workflow, and matching local augmentations win on conflict.
-- Skill Sync preserves every upstream category except `deprecated` as an exact, inspectable vendored copy. Normal Pi discovery deliberately promotes only `engineering` and `productivity`; `misc`, `in-progress`, and any future unpromoted categories remain vendored without entering the runtime skill catalog. The vendored copy is canonical for Matt's skills across the whole environment, so they are not duplicated in the environment's `skills/` directory.
-- Vendored skills are exact upstream copies, including upstream's `disable-model-invocation` choices: skills upstream marks user-invoked stay user-invoked here.
+- Skill Sync preserves every upstream category except `deprecated` as an exact, inspectable vendored copy. No vendor category is registered for ambient Pi discovery. The pinned copy exists only for precise workflow routing; `GregM1991/skills` is canonical for general-purpose skills.
+- Vendored skills are exact upstream copies, including upstream's `disable-model-invocation` choices.
 
 Inspect mapping with:
 
@@ -300,7 +300,7 @@ bun run check
 
 The sync command clones `https://github.com/mattpocock/skills`, replaces every vendored category directory (all except `deprecated`), copies the upstream license, and updates `vendor/mattpocock-skills/SOURCE.json` with the exact upstream commit.
 
-After syncing, inspect `/matt-skills` and `index.ts` for renamed or newly useful skills before publishing, and check whether upstream added skills that duplicate a job owned by a skill in the environment's `skills/` directory (upstream wins; prune the local one).
+After syncing, inspect `/matt-skills` and `index.ts` for renamed or newly useful workflow paths before publishing. Keep local workflow changes in `augmentations/` or `docs/agents/`, not in the vendor.
 
 ## Verify
 

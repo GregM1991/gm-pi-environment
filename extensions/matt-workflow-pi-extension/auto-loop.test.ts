@@ -380,7 +380,7 @@ describe("retro phase contract", () => {
 });
 
 describe("resource discovery", () => {
-	test("registers only the local workflow router and promoted vendor categories", async () => {
+	test("registers only the local workflow router and keeps the vendor private", async () => {
 		type ResourceResult = { skillPaths: string[] } | undefined;
 		let discover: (() => Promise<ResourceResult>) | undefined;
 		mattWorkflowExtension({
@@ -391,11 +391,8 @@ describe("resource discovery", () => {
 		} as never);
 
 		const resources = await discover?.();
-		expect(resources?.skillPaths).toEqual([
-			path.join(import.meta.dir, "skills"),
-			path.join(import.meta.dir, "vendor", "mattpocock-skills", "engineering"),
-			path.join(import.meta.dir, "vendor", "mattpocock-skills", "productivity"),
-		]);
+		expect(resources?.skillPaths).toEqual([path.join(import.meta.dir, "skills")]);
+		expect(resources?.skillPaths.some((skillPath) => skillPath.includes(path.join("vendor", "mattpocock-skills")))).toBe(false);
 	});
 });
 
